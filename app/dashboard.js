@@ -1,7 +1,7 @@
 // app/dashboard.js
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RealTimeMonitor from '../components/RealTimeMonitor';
 import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
@@ -171,7 +171,7 @@ export default function Dashboard() {
 
 // Your existing styles remain the same...
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: '#0a0a0a', paddingTop: StatusBar.currentHeight - 20 },
   header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#111' },
   title: { color: '#00ff88', fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

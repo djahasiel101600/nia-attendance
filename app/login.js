@@ -1,101 +1,123 @@
+// app/login.js - Add auto-login check
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AuthService from '../services/AuthService';
 
-export default function LoginScreen() {
+export default function Login() {
+  const router = useRouter();
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [autoLoginLoading, setAutoLoginLoading] = useState(true);
+
+  // Check for stored credentials on component mount
+  useEffect(() => {
+    checkStoredCredentials();
+  }, []);
+
+  const checkStoredCredentials = async () => {
+    try {
+      const creds = await AuthService.getStoredCredentials();
+      if (creds.employeeId && creds.password) {
+        console.log('🔑 Found stored credentials, attempting auto-login...');
+        
+        // Try to auto-login
+        setAutoLoginLoading(true);
+        const success = await AuthService.login(creds.employeeId, creds.password);
+        
+        if (success) {
+          console.log('✅ Auto-login successful!');
+          router.replace('/dashboard');
+        } else {
+          console.log('❌ Auto-login failed, showing login form');
+          // Pre-fill the form with stored credentials
+          setEmployeeId(creds.employeeId);
+          setPassword(creds.password);
+        }
+      }
+    } catch (error) {
+      console.error('Auto-login check error:', error);
+    } finally {
+      setAutoLoginLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
-    if (!employeeId.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both Employee ID and Password');
+    if (!employeeId || !password) {
+      alert('Please enter both Employee ID and Password');
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     try {
       const success = await AuthService.login(employeeId, password);
       if (success) {
         router.replace('/dashboard');
       } else {
-        Alert.alert('Login Failed', 'Invalid credentials. Please try again.');
+        alert('Login failed. Please check your credentials.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Login failed. Please check your connection and try again.');
+      alert('Login error: ' + error.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  if (autoLoginLoading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#00ff88" />
+        <Text style={styles.loadingText}>Auto-logging in...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>NIA Attendance</Text>
-        <Text style={styles.subtitle}>Biometric Monitor</Text>
-      </View>
+      <Text style={styles.title}>NIA Attendance</Text>
+      <Text style={styles.subtitle}>Login to continue</Text>
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Employee ID"
+        value={employeeId}
+        onChangeText={setEmployeeId}
+        autoCapitalize="none"
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      
+      <TouchableOpacity 
+        style={styles.loginButton} 
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#000" />
+        ) : (
+          <Text style={styles.loginButtonText}>Login</Text>
+        )}
+      </TouchableOpacity>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Employee ID"
-          placeholderTextColor="#666"
-          value={employeeId}
-          onChangeText={setEmployeeId}
-          autoCapitalize="none"
-          editable={!isLoading}
-        />
-        
-        <View style={styles.passwordRow}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Password"
-            placeholderTextColor="#666"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            editable={!isLoading}
-          />
-          <TouchableWithoutFeedback onPress={() => setShowPassword((s) => !s)}>
-            <View style={styles.showBtn}>
-              <Text style={{ color: '#00ff88' }}>{showPassword ? 'Hide' : 'Show'}</Text>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-
-        <View style={styles.rememberRow}>
-          <TouchableOpacity onPress={() => setRemember((r) => !r)} style={styles.checkbox}>
-            <Text style={{ color: remember ? '#00ff88' : '#666' }}>{remember ? '☑' : '☐'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.rememberText}>Remember credentials</Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.button, isLoading && styles.buttonDisabled]} 
-          onPress={handleLogin}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Optional: Add a "Clear Credentials" button for testing */}
+      <TouchableOpacity 
+        style={styles.clearButton}
+        onPress={async () => {
+          await AuthService.logout();
+          setEmployeeId('');
+          setPassword('');
+          alert('Credentials cleared!');
+        }}
+      >
+        <Text style={styles.clearButtonText}>Clear Saved Credentials</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -103,51 +125,58 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
-    justifyContent: 'center',
     padding: 20,
+    justifyContent: 'center',
+    backgroundColor: '#0a0a0a',
   },
-  header: {
+  center: {
     alignItems: 'center',
-    marginBottom: 50,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#00ff88',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  subtitle: { fontSize: 14, color: '#888' },
-  form: {
-    backgroundColor: '#1a1a1a',
-    padding: 20,
-    borderRadius: 12,
+  subtitle: {
+    fontSize: 16,
+    color: '#aaa',
+    textAlign: 'center',
+    marginBottom: 40,
   },
-  passwordRow: { flexDirection: 'row', alignItems: 'center' },
-  showBtn: { padding: 10, marginLeft: 8 },
-  rememberRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  checkbox: { marginRight: 8 },
-  rememberText: { color: '#aaa' },
   input: {
-    backgroundColor: '#2a2a2a',
-    color: '#fff',
-    padding: 15,
+    backgroundColor: '#ffffffff',
+    color: '#000000ff',
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 16,
     fontSize: 16,
   },
-  button: {
+  loginButton: {
     backgroundColor: '#00ff88',
-    padding: 15,
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 20,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
+  loginButtonText: {
     color: '#000',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+  },
+  loadingText: {
+    color: '#00ff88',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  clearButton: {
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  clearButtonText: {
+    color: '#ff6666',
+    fontSize: 14,
   },
 });
