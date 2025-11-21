@@ -1,4 +1,4 @@
-
+// services/ApiService.js
 const BASE_URL = "https://attendance.caraga.nia.gov.ph";
 
 class ApiService {
@@ -134,6 +134,96 @@ class ApiService {
       return null;
     }
   };
+  
+  getSignalRToken = async () => {
+    try {
+      console.log('🔧 Fetching SignalR connection token...');
+      
+      // Method 1: Try to extract from attendance page cookies
+      const response = await fetch(`${BASE_URL}/Attendance`, {
+        method: 'GET',
+        headers: {
+          'Referer': `${BASE_URL}/Attendance`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      // Get cookies from response
+      const setCookieHeader = response.headers.get('set-cookie');
+      
+      if (setCookieHeader) {
+        // Look for connection token in cookies
+        const tokenPatterns = [
+          /connectionToken=([^;]+)/,
+          /SignalR\.ConnectionToken=([^;]+)/,
+          /__SignalRToken=([^;]+)/
+        ];
+        
+        for (const pattern of tokenPatterns) {
+          const match = setCookieHeader.match(pattern);
+          if (match && match[1]) {
+            console.log('✅ SignalR token found in cookies');
+            return match[1];
+          }
+        }
+      }
+
+      // Method 2: Try SignalR negotiation
+      console.log('🔄 Trying SignalR negotiation...');
+      return await this._trySignalRNegotiation();
+      
+    } catch (error) {
+      console.error('🚨 Error getting SignalR token:', error);
+      return null;
+    }
+  };
+
+  _trySignalRNegotiation = async () => {
+    try {
+      const negotiateUrl = `${BASE_URL}/signalr/negotiate`;
+      
+      const params = new URLSearchParams({
+        'clientProtocol': '2.1',
+        'connectionData': '[{"name":"biohub"}]',
+        '_': Date.now().toString()
+      });
+
+      const response = await fetch(`${negotiateUrl}?${params}`, {
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Referer': `${BASE_URL}/Attendance`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.ConnectionToken) {
+          console.log('✅ SignalR token from negotiation');
+          return data.ConnectionToken;
+        }
+        
+        if (data.Url) {
+          const tokenMatch = data.Url.match(/connectionToken=([^&]+)/);
+          if (tokenMatch) {
+            console.log('✅ SignalR token from URL');
+            return tokenMatch[1];
+          }
+        }
+      }
+      
+      console.log('❌ No token found in negotiation');
+      return null;
+      
+    } catch (error) {
+      console.error('🚨 SignalR negotiation failed:', error);
+      return null;
+    }
+  };
+
+
 }
 
 export default new ApiService();

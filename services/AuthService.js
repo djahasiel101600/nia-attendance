@@ -1,3 +1,4 @@
+// services/AuthService.js - FIXED API TEST
 import * as SecureStore from 'expo-secure-store';
 
 const BASE_URL = "https://attendance.caraga.nia.gov.ph";
@@ -5,57 +6,33 @@ const AUTH_BASE = 'https://accounts.nia.gov.ph';
 
 class AuthService {
   session = null;
+  memoryCookies = null;
 
   login = async (employeeId, password) => {
     try {
       console.log('🔐 Attempting login...');
       
-      // Step 1: Get login page to extract CSRF token
       const defaultHeaders = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       };
 
-      // Try initial login page and fallback to a few common variants if server returns non-200
-      const tryGet = async (path) => {
-        try {
-          const res = await fetch(`${BASE_URL}${path}`, { headers: defaultHeaders });
-          console.log(`🔎 GET ${path} -> ${res.status} ${res.url}`);
-          const body = await res.text();
-          return { res, body };
-        } catch (e) {
-          console.warn(`⚠️ GET ${path} failed:`, e.message || e);
-          return { res: null, body: null };
-        }
-      };
+      // Step 1: Get login page
+      console.log('📡 Getting login page...');
+      const loginPageResponse = await fetch(`${AUTH_BASE}/Account/Login?ReturnUrl=${encodeURIComponent(BASE_URL + '/')}`, { 
+        headers: defaultHeaders 
+      });
+      
+      console.log(`🔎 GET Login Page -> ${loginPageResponse.status}`);
+      
+      const html = await loginPageResponse.text();
 
-      const tryGetAuth = async (path) => {
-        try {
-          const res = await fetch(`${AUTH_BASE}${path}`, { headers: defaultHeaders });
-          console.log(`🔎 AUTH GET ${path} -> ${res.status} ${res.url}`);
-          const body = await res.text();
-          return { res, body };
-        } catch (e) {
-          console.warn(`⚠️ AUTH GET ${path} failed:`, e.message || e);
-          return { res: null, body: null };
-        }
-      };
-
-      const candidates = ['/Account/Login', '/Account/Login/', '/Account/Login?ReturnUrl=%2F', '/Attendance', '/'];
-      let loginPageResponse = null;
-      let html = null;
-      let foundPath = null;
-
-
-      // Try all candidate pages on the auth host and stop only when we can extract a CSRF token
-      // Ensure extractToken is defined before use
+      // Extract CSRF token
       const extractToken = (source) => {
         if (!source) return null;
         const patterns = [
-          /name=["']__RequestVerificationToken["']\s*.*?value=["']([^"']+)["']/i,
-          /value=["']([^"']+)["']\s*.*?name=["']__RequestVerificationToken["']/i,
-          /id=["']__RequestVerificationToken["']\s*.*?value=["']([^"']+)["']/i,
-          /\"__RequestVerificationToken\"\s*:\s*\"([^\"]+)\"/i
+          /name="__RequestVerificationToken"[^>]*value="([^"]*)"/i,
+          /name='__RequestVerificationToken'[^>]*value='([^']*)'/i,
         ];
         for (const p of patterns) {
           const m = source && source.match(p);
@@ -64,112 +41,61 @@ class AuthService {
         return null;
       };
 
-      for (const p of candidates) {
-        // Use the auth host for login page retrieval
-        const { res, body } = await tryGetAuth(p);
-        if (res) {
-          loginPageResponse = res;
-          html = body;
-        }
-
-        // Try to extract token from this response body immediately
-        const tokenCandidate = extractToken(body);
-        if (tokenCandidate) {
-          html = body;
-          foundPath = p;
-          // use this response as the loginPageResponse
-          break;
-        }
-      }
-
-      if (!loginPageResponse) {
-        console.error('🚨 Failed to GET any login page variants from server');
-        throw new Error('Login page unreachable');
-      }
-
-      if (foundPath) {
-        console.log(`✅ Token found on path ${foundPath}`);
-      }
-
-      const csrfToken = (function() {
-        // reuse the same extractor defined above
-        return extractToken(html);
-      })();
+      const csrfToken = extractToken(html);
       if (!csrfToken) {
-        // Helpful debug: print a short snippet of the returned HTML for investigation
-        console.error('🚨 Security token not found. HTML snippet:', html ? html.slice(0, 1200) : '<no body>');
+        console.error('🚨 Security token not found');
         throw new Error('Security token not found');
       }
 
       console.log('✅ CSRF token extracted');
       
       // Step 2: Perform login
-      const loginData = new URLSearchParams({
-        'EmployeeId': employeeId,
-        'Password': password,
-        'RememberMe': 'false',
-        '__RequestVerificationToken': csrfToken
-      });
-
-      // Include cookies returned from the initial GET in the POST to improve server acceptance
-  const initialSetCookie = loginPageResponse.headers.get('set-cookie') || loginPageResponse.headers.get('Set-Cookie') || '';
-
+      console.log('📡 Performing login...');
+      
+      const postData = `__RequestVerificationToken=${encodeURIComponent(csrfToken)}&EmployeeID=${encodeURIComponent(employeeId)}&Password=${encodeURIComponent(password)}&RememberMe=false`;
+      
       const postHeaders = {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': `${AUTH_BASE}/Account/Login`,
+        'Referer': `${AUTH_BASE}/Account/Login?ReturnUrl=${encodeURIComponent(BASE_URL + '/')}`,
         'Origin': AUTH_BASE,
         ...defaultHeaders
       };
-      if (initialSetCookie) postHeaders['Cookie'] = initialSetCookie;
 
-  // POST to the auth host (accounts.nia.gov.ph)
-  const loginResponse = await fetch(`${AUTH_BASE}/Account/Login`, {
+      const loginResponse = await fetch(`${AUTH_BASE}/Account/Login`, {
         method: 'POST',
         headers: postHeaders,
-        body: loginData.toString()
+        body: postData,
+        redirect: 'manual'
       });
 
-  console.log(`🔎 POST ${AUTH_BASE}/Account/Login -> ${loginResponse.status} ${loginResponse.url}`);
-  const respSetCookie = loginResponse.headers.get('set-cookie') || loginResponse.headers.get('Set-Cookie') || '';
-  if (respSetCookie) console.log('🔎 POST set-cookie:', respSetCookie.slice(0, 200));
-
-      // Check if login was successful
-      if (loginResponse.ok) {
-        const responseText = await loginResponse.text();
-        
-  if (responseText.includes('Dashboard') || !responseText.includes('Login')) {
-          // Store credentials securely
-          await SecureStore.setItemAsync('employeeId', employeeId);
-          await SecureStore.setItemAsync('password', password);
-          
-          // Store cookies from response
-          const authCookies = loginResponse.headers.get('set-cookie') || loginResponse.headers.get('Set-Cookie') || initialSetCookie || '';
-          if (authCookies) {
-            // Save auth cookies (may be used for debugging)
-            await SecureStore.setItemAsync('authCookies', authCookies);
-          }
-
-          // After successful auth, visit the attendance page to obtain attendance-site cookies
-          try {
-            const attendanceResp = await fetch(`${BASE_URL}/Attendance`, { headers: { ...defaultHeaders, Cookie: authCookies } });
-            console.log(`🔎 POST-AUTH GET /Attendance -> ${attendanceResp.status} ${attendanceResp.url}`);
-            const attendanceSet = attendanceResp.headers.get('set-cookie') || attendanceResp.headers.get('Set-Cookie') || '';
-            const cookies = attendanceSet || authCookies;
-            if (cookies) {
-              await SecureStore.setItemAsync('sessionCookies', cookies);
-            }
-          } catch (e) {
-            console.warn('⚠️ Failed to fetch attendance page after login:', e.message || e);
-          }
-          
-          console.log('✅ Login successful');
-          return true;
-        }
-      }
+      console.log(`🔎 POST Login -> ${loginResponse.status}`);
       
-  // Helpful debug snippet when login fails
-  console.error('❌ Login failed. Response snippet:', responseText ? responseText.slice(0, 800) : '<no body>');
-  return false;
+      const responseText = await loginResponse.text();
+      
+      // Check if login was successful
+      const isSuccessful = loginResponse.status === 302 || 
+                          !responseText.includes('Login') || 
+                          responseText.includes('Dashboard');
+      
+      if (isSuccessful) {
+        console.log('✅ Login successful');
+        
+        // Store credentials
+        await SecureStore.setItemAsync('employeeId', employeeId);
+        await SecureStore.setItemAsync('password', password);
+        
+        // Try to get cookies if available
+        const cookies = loginResponse.headers.get('set-cookie') || loginResponse.headers.get('Set-Cookie') || '';
+        if (cookies) {
+          await SecureStore.setItemAsync('sessionCookies', cookies);
+          this.memoryCookies = cookies;
+        }
+        
+        return true;
+      } else {
+        console.log('❌ Login failed');
+        return false;
+      }
       
     } catch (error) {
       console.error('🚨 Login error:', error);
@@ -182,6 +108,7 @@ class AuthService {
     await SecureStore.deleteItemAsync('password');
     await SecureStore.deleteItemAsync('sessionCookies');
     this.session = null;
+    this.memoryCookies = null;
   };
 
   getStoredCredentials = async () => {
@@ -195,7 +122,43 @@ class AuthService {
   };
 
   getSessionCookies = async () => {
-    return await SecureStore.getItemAsync('sessionCookies');
+    try {
+      const cookies = await SecureStore.getItemAsync('sessionCookies');
+      if (cookies) {
+        return cookies;
+      }
+      return this.memoryCookies;
+    } catch (error) {
+      return this.memoryCookies;
+    }
+  };
+
+  // SIMPLE API TEST - Just check if we can make any API call
+  testAccess = async (employeeId) => {
+    try {
+      console.log('🧪 Testing API access with simple request...');
+      
+      // Use the same exact call as your working dashboard
+      const response = await fetch(`${BASE_URL}/Attendance/IndexData/${new Date().getFullYear()}?month=${new Date().toLocaleString('default', { month: 'long' })}&eid=${employeeId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': `${BASE_URL}/Attendance`
+        },
+        body: 'draw=1&start=0&length=1' // Minimal payload
+      });
+      
+      console.log(`🧪 API test -> ${response.status}`);
+      
+      // Consider it successful if we get any 2xx status
+      const success = response.status >= 200 && response.status < 300;
+      console.log('🧪 API access:', success ? 'SUCCESS' : `FAILED (${response.status})`);
+      
+      return success;
+    } catch (error) {
+      console.error('🧪 API test error:', error);
+      return false;
+    }
   };
 }
 

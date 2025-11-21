@@ -1,6 +1,8 @@
+// app/dashboard.js
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import RealTimeMonitor from '../components/RealTimeMonitor';
 import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
 
@@ -10,7 +12,7 @@ export default function Dashboard() {
   const [records, setRecords] = useState([]);
   const [employeeId, setEmployeeId] = useState(null);
   const [isLive, setIsLive] = useState(false);
-  const pollingRef = useRef(null);
+  const [showRealTimeMonitor, setShowRealTimeMonitor] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -24,7 +26,9 @@ export default function Dashboard() {
       setLoading(false);
     })();
 
-    return () => stopLive();
+    return () => {
+      // Cleanup will be handled by RealTimeMonitor component
+    };
   }, []);
 
   const refresh = async () => {
@@ -45,19 +49,15 @@ export default function Dashboard() {
     await refresh();
   };
 
-  const startLive = () => {
-    if (isLive) return;
-    setIsLive(true);
-    pollingRef.current = setInterval(async () => {
-      await refresh();
-    }, 30000);
-  };
-
-  const stopLive = () => {
-    setIsLive(false);
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
+  const toggleRealTimeMonitor = () => {
+    if (showRealTimeMonitor) {
+      // If already showing, just hide it
+      setShowRealTimeMonitor(false);
+      setIsLive(false);
+    } else {
+      // Show real-time monitor
+      setShowRealTimeMonitor(true);
+      setIsLive(true);
     }
   };
 
@@ -65,6 +65,14 @@ export default function Dashboard() {
     await AuthService.logout();
     router.replace('/login');
   };
+
+  // Calculate stats
+  const todayRecords = records.filter(record => {
+    const today = new Date().toDateString();
+    return new Date(record.date_time).toDateString() === today;
+  });
+
+  const deniedRecords = records.filter(record => record.status === 'ACCESS_DENIED');
 
   const renderItem = ({ item }) => (
     <View style={styles.item}>
@@ -75,55 +83,93 @@ export default function Dashboard() {
         </View>
       </View>
       <Text style={styles.meta}>{item.date_time_string} · {item.machine_name}</Text>
+      {item.temperature && (
+        <Text style={styles.meta}>🌡️ {item.temperature}°C</Text>
+      )}
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>NIA Attendance</Text>
-        <View style={styles.controlsRow}>
-          <Text style={styles.subtitle}>Employee: {employeeId}</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={styles.smallBtn} onPress={refresh}>
-              <Text style={styles.smallBtnText}>Refresh</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.smallBtn, isLive && styles.smallBtnActive]} onPress={isLive ? stopLive : startLive}>
-              <Text style={styles.smallBtnText}>{isLive ? 'Stop Live' : 'Start Live'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.stat}><Text style={styles.statNumber}>{records.length}</Text><Text style={styles.statLabel}>Records</Text></View>
-          <View style={styles.stat}><Text style={styles.statNumber}>—</Text><Text style={styles.statLabel}>Today</Text></View>
-          <View style={styles.stat}><Text style={styles.statNumber}>—</Text><Text style={styles.statLabel}>Denied</Text></View>
-        </View>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#00ff88" style={{ marginTop: 32 }} />
-      ) : (
-        <FlatList
-          data={records}
-          keyExtractor={(r, i) => r.employee_id + '_' + i}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-          ListEmptyComponent={<Text style={{ color: '#888' }}>No records found</Text>}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} colors={['#00ff88']} />}
+      {/* Show RealTimeMonitor as overlay when active */}
+      {showRealTimeMonitor ? (
+        <RealTimeMonitor 
+          employeeId={employeeId}
+          onClose={() => {
+            setShowRealTimeMonitor(false);
+            setIsLive(false);
+          }}
+          onDataUpdate={(newRecords) => {
+            // Update the main records when real-time data changes
+            setRecords(newRecords);
+          }}
         />
-      )}
+      ) : (
+        <>
+          <View style={styles.header}>
+            <Text style={styles.title}>NIA Attendance</Text>
+            <View style={styles.controlsRow}>
+              <Text style={styles.subtitle}>Employee: {employeeId}</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity style={styles.smallBtn} onPress={refresh}>
+                  <Text style={styles.smallBtnText}>Refresh</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.smallBtn, isLive && styles.smallBtnActive]} 
+                  onPress={toggleRealTimeMonitor}
+                >
+                  <Text style={styles.smallBtnText}>
+                    {isLive ? 'Stop Live' : 'Start Live'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                  <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-      <TouchableOpacity style={[styles.fab, isLive && styles.fabActive]} onPress={isLive ? stopLive : startLive}>
-        <Text style={styles.fabText}>{isLive ? 'LIVE' : 'GO'}</Text>
-      </TouchableOpacity>
+            <View style={styles.statsRow}>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{records.length}</Text>
+                <Text style={styles.statLabel}>Records</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{todayRecords.length}</Text>
+                <Text style={styles.statLabel}>Today</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{deniedRecords.length}</Text>
+                <Text style={styles.statLabel}>Denied</Text>
+              </View>
+            </View>
+          </View>
+
+          {loading ? (
+            <ActivityIndicator size="large" color="#00ff88" style={{ marginTop: 32 }} />
+          ) : (
+            <FlatList
+              data={records}
+              keyExtractor={(r, i) => r.employee_id + '_' + i}
+              renderItem={renderItem}
+              contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+              ListEmptyComponent={<Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>No records found</Text>}
+              refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} colors={['#00ff88']} />}
+            />
+          )}
+
+          <TouchableOpacity 
+            style={[styles.fab, isLive && styles.fabActive]} 
+            onPress={toggleRealTimeMonitor}
+          >
+            <Text style={styles.fabText}>{isLive ? 'LIVE' : 'GO LIVE'}</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
 
+// Your existing styles remain the same...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0a' },
   header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#111' },
