@@ -1,4 +1,4 @@
-// app/login.js - Add auto-login check
+// app/login.js
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -9,39 +9,26 @@ export default function Login() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [autoLoginLoading, setAutoLoginLoading] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Check for stored credentials on component mount
   useEffect(() => {
-    checkStoredCredentials();
-  }, []);
-
-  const checkStoredCredentials = async () => {
-    try {
-      const creds = await AuthService.getStoredCredentials();
-      if (creds.employeeId && creds.password) {
-        console.log('🔑 Found stored credentials, attempting auto-login...');
-        
-        // Try to auto-login
-        setAutoLoginLoading(true);
-        const success = await AuthService.login(creds.employeeId, creds.password);
-        
-        if (success) {
-          console.log('✅ Auto-login successful!');
+    const checkStoredCredentials = async () => {
+      try {
+        const creds = await AuthService.getStoredCredentials();
+        if (creds.employeeId) {
+          // User is already logged in, redirect to dashboard
           router.replace('/dashboard');
         } else {
-          console.log('❌ Auto-login failed, showing login form');
-          // Pre-fill the form with stored credentials
-          setEmployeeId(creds.employeeId);
-          setPassword(creds.password);
+          setCheckingAuth(false);
         }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setCheckingAuth(false);
       }
-    } catch (error) {
-      console.error('Auto-login check error:', error);
-    } finally {
-      setAutoLoginLoading(false);
-    }
-  };
+    };
+
+    checkStoredCredentials();
+  }, [router]);
 
   const handleLogin = async () => {
     if (!employeeId || !password) {
@@ -64,11 +51,11 @@ export default function Login() {
     }
   };
 
-  if (autoLoginLoading) {
+  if (checkingAuth) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color="#00ff88" />
-        <Text style={styles.loadingText}>Auto-logging in...</Text>
+        <Text style={styles.loadingText}>Checking authentication...</Text>
       </View>
     );
   }
@@ -84,6 +71,7 @@ export default function Login() {
         value={employeeId}
         onChangeText={setEmployeeId}
         autoCapitalize="none"
+        placeholderTextColor="#666"
       />
       
       <TextInput
@@ -92,6 +80,7 @@ export default function Login() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        placeholderTextColor="#666"
       />
       
       <TouchableOpacity 
@@ -104,19 +93,6 @@ export default function Login() {
         ) : (
           <Text style={styles.loginButtonText}>Login</Text>
         )}
-      </TouchableOpacity>
-
-      {/* Optional: Add a "Clear Credentials" button for testing */}
-      <TouchableOpacity 
-        style={styles.clearButton}
-        onPress={async () => {
-          await AuthService.logout();
-          setEmployeeId('');
-          setPassword('');
-          alert('Credentials cleared!');
-        }}
-      >
-        <Text style={styles.clearButtonText}>Clear Saved Credentials</Text>
       </TouchableOpacity>
     </View>
   );
@@ -146,12 +122,14 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   input: {
-    backgroundColor: '#ffffffff',
-    color: '#000000ff',
+    backgroundColor: '#1a1a1a',
+    color: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
   },
   loginButton: {
     backgroundColor: '#00ff88',
@@ -169,14 +147,5 @@ const styles = StyleSheet.create({
     color: '#00ff88',
     marginTop: 16,
     fontSize: 16,
-  },
-  clearButton: {
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  clearButtonText: {
-    color: '#ff6666',
-    fontSize: 14,
   },
 });

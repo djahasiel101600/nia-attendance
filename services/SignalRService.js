@@ -1,4 +1,6 @@
-// services/SignalRService.js - WEB SOCKET DIRECT APPROACH
+// services/SignalRService.js
+import { API_CONFIG, APP_CONFIG } from '../constants/config';
+
 class SignalRService {
   constructor() {
     this.ws = null;
@@ -6,7 +8,7 @@ class SignalRService {
     this.callbacks = [];
     this.messageId = 0;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = APP_CONFIG.MAX_RECONNECT_ATTEMPTS;
   }
 
   addCallback(callback) {
@@ -35,8 +37,7 @@ class SignalRService {
   // Build WebSocket URL for ASP.NET SignalR
   buildWebSocketUrl(connectionToken) {
     // ASP.NET SignalR uses this format
-    const url = `wss://attendance.caraga.nia.gov.ph/signalr/connect?transport=webSockets&clientProtocol=1.5&connectionToken=${encodeURIComponent(connectionToken)}&connectionData=${encodeURIComponent('[{"name":"biohub"}]')}&tid=${Math.floor(Math.random() * 10)}`;
-    console.log('🔧 WebSocket URL:', url);
+    const url = `wss://${API_CONFIG.BASE_URL.replace(/^https?:\/\//, '')}/signalr/connect?transport=webSockets&clientProtocol=${API_CONFIG.SIGNALR_CLIENT_PROTOCOL}&connectionToken=${encodeURIComponent(connectionToken)}&connectionData=${encodeURIComponent(`[{"name":"${API_CONFIG.SIGNALR_HUB_NAME}"}]`)}&tid=${Math.floor(Math.random() * 10)}`;
     return url;
   }
 
@@ -60,12 +61,10 @@ class SignalRService {
   handleMessage(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log('📨 SignalR message:', data);
       
       if (data.M) { // Messages array
         data.M.forEach(message => {
-          if (message.H === 'biohub' && message.M === 'update') {
-            console.log('🔔 BioHub update received');
+          if (message.H === API_CONFIG.SIGNALR_HUB_NAME && message.M === 'update') {
             this.notifyCallbacks('NEW_DATA_AVAILABLE');
           }
         });
@@ -87,12 +86,11 @@ class SignalRService {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('✅ WebSocket connected');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         
         // Send initial join message
-        this.sendMessage('biohub', 'Join');
+        this.sendMessage(API_CONFIG.SIGNALR_HUB_NAME, 'Join');
         
         this.notifyCallbacks('CONNECTED');
       };
@@ -100,7 +98,6 @@ class SignalRService {
       this.ws.onmessage = (event) => this.handleMessage(event);
       
       this.ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason);
         this.isConnected = false;
         this.notifyCallbacks('DISCONNECTED', { error: `Connection closed: ${event.code}` });
         
@@ -109,7 +106,7 @@ class SignalRService {
       };
       
       this.ws.onerror = (error) => {
-        console.error('🚨 WebSocket error:', error);
+        console.error('WebSocket error:', error);
         this.isConnected = false;
         this.notifyCallbacks('CONNECTION_FAILED', { error });
       };
@@ -128,15 +125,11 @@ class SignalRService {
       this.reconnectAttempts++;
       const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
       
-      console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-      
       setTimeout(() => {
         if (!this.isConnected) {
           this.startConnection(connectionToken, sessionCookies);
         }
       }, delay);
-    } else {
-      console.log('❌ Max reconnection attempts reached');
     }
   }
 
@@ -150,7 +143,6 @@ class SignalRService {
     }
     
     this.isConnected = false;
-    console.log('✅ SignalR connection stopped');
   }
 
   getStatus() {

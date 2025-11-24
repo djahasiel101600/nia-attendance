@@ -1,8 +1,14 @@
 //services/AttendanceService.js
+import { API_CONFIG, APP_CONFIG } from '../constants/config';
 import AuthService from './AuthService';
 
-const BASE_URL = 'https://attendance.caraga.nia.gov.ph';
+const BASE_URL = API_CONFIG.BASE_URL;
 
+/**
+ * Parses a .NET date format string to JavaScript Date
+ * @param {string} netDateString - Date string in .NET format (/Date(timestamp)/)
+ * @returns {Date} Parsed Date object
+ */
 function parseNetDate(netDateString) {
   try {
     const m = /\/Date\((\d+)\)\//.exec(netDateString);
@@ -15,9 +21,21 @@ function parseNetDate(netDateString) {
   return new Date();
 }
 
+/**
+ * Service for fetching and managing attendance data
+ */
 class AttendanceService {
+  /**
+   * Fetches attendance data for an employee
+   * @param {string} employeeId - The employee's ID
+   * @param {Object} opts - Options for fetching data
+   * @param {number} [opts.length] - Number of records to fetch
+   * @param {number} [opts.year] - Year to fetch data for
+   * @param {string} [opts.month] - Month to fetch data for
+   * @returns {Promise<{records: Array, total_records: number} | null>} Attendance data or null on error
+   */
   getAttendanceData = async (employeeId, opts = {}) => {
-    const { length = 50, year, month } = opts;
+    const { length = APP_CONFIG.DEFAULT_RECORDS_LENGTH, year, month } = opts;
     try {
       // Reuse session cookies stored by AuthService if available
       const cookies = await AuthService.getSessionCookies();
@@ -91,16 +109,7 @@ class AttendanceService {
         'Referer': `${BASE_URL}/Attendance`
       };
 
-      // Debugging: log cookie/header summary
-      console.log('🔍 Attendance POST headers:', {
-        Cookie: headers.Cookie ? headers.Cookie.slice(0, 200) : '',
-        Origin: headers.Origin,
-        Referer: headers.Referer
-      });
-
       const bodyString = form.toString();
-      console.log('🔎 POST', url);
-      console.log('🔎 POST body sample:', bodyString.slice(0, 300));
 
       const resp = await fetch(url, {
         method: 'POST',
@@ -108,11 +117,8 @@ class AttendanceService {
         body: bodyString
       });
 
-      console.log(`🔎 POST ${url} -> ${resp.status} ${resp.url}`);
       if (!resp.ok) {
-        const text = await resp.text().catch(() => '<no body>');
-        console.error('❌ Attendance POST failed:', resp.status, text ? text.slice(0, 1000) : '<no body>');
-        throw new Error(`Network error: ${resp.status}`);
+        throw new Error(`Failed to fetch attendance data: ${resp.status}`);
       }
 
       const json = await resp.json();

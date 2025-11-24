@@ -1,136 +1,141 @@
-// components/RealTimeMonitor.js - UPDATED
-import { useCallback, useEffect, useState } from 'react';
+// components/RealTimeMonitor.js
+import PropTypes from 'prop-types';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ApiService from '../services/ApiService';
 import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
 import SignalRService from '../services/SignalRService';
 
+/**
+ * Real-time monitoring component for attendance data
+ * @param {Object} props - Component props
+ * @param {string} props.employeeId - Employee ID to monitor
+ * @param {Function} [props.onClose] - Callback when monitor is closed
+ * @param {Function} [props.onDataUpdate] - Callback when data is updated
+ */
 const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [signalCount, setSignalCount] = useState(0);
+  
+  // Use ref to store the latest onDataUpdate callback without triggering re-renders
+  const onDataUpdateRef = useRef(onDataUpdate);
+  
+  useEffect(() => {
+    onDataUpdateRef.current = onDataUpdate;
+  }, [onDataUpdate]);
 
   // Fetch actual attendance data from API
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📡 Fetching fresh attendance data...');
       
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
       if (data && data.records) {
         setAttendanceData(data.records);
-        if (onDataUpdate) {
-          onDataUpdate(data.records);
+        if (onDataUpdateRef.current) {
+          onDataUpdateRef.current(data.records);
         }
       }
       
       setLastUpdate(new Date());
-      console.log(`✅ Loaded ${data?.records?.length || 0} attendance records`);
     } catch (error) {
-      console.error('❌ Error fetching attendance data:', error);
+      console.error('Error fetching attendance data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeId]);
 
   // Handle SignalR notifications
   const handleSignalRNotification = useCallback((signalType, data) => {
-    console.log(`🔔 SignalR Notification: ${signalType}`);
-    
     switch (signalType) {
       case 'NEW_DATA_AVAILABLE':
         setSignalCount(prev => prev + 1);
-        console.log('🎯 New attendance entry detected - refreshing data...');
         fetchAttendanceData();
         break;
         
       case 'CONNECTED':
         setConnectionStatus('connected');
-        console.log('✅ Connected to real-time notifications');
         fetchAttendanceData();
         break;
         
       case 'DISCONNECTED':
         setConnectionStatus('disconnected');
-        console.log('❌ Real-time notifications disconnected');
         break;
         
       case 'RECONNECTING':
         setConnectionStatus('reconnecting');
-        console.log('🔄 Reconnecting to notifications...');
         break;
         
       case 'CONNECTION_FAILED':
         setConnectionStatus('failed');
-        console.error('❌ Failed to connect to notifications');
         Alert.alert('Connection Failed', 'Real-time updates unavailable');
         break;
     }
-  }, [employeeId]);
+  }, [fetchAttendanceData]);
 
-  // Start real-time monitoring - SIMPLIFIED
-  const startMonitoring = async () => {
+  // Start real-time monitoring
+  const startMonitoring = useCallback(async () => {
     try {
       setConnectionStatus('connecting');
       
-      console.log('🔍 Starting real-time monitoring...');
-      
-      // Since we know login works and API calls work, skip the test
-      console.log('✅ Skipping API test - login is working');
-      
       // Get session cookies for SignalR
       const sessionCookies = await AuthService.getSessionCookies();
-      console.log('🔍 Session cookies available:', sessionCookies ? 'Yes' : 'No');
       
       // Try SignalR connection
-      console.log('🔧 Attempting SignalR connection...');
       const connectionToken = await ApiService.getSignalRToken();
       
       if (connectionToken) {
-        console.log('🔧 SignalR token acquired');
-        
         SignalRService.addCallback(handleSignalRNotification);
         
         const connected = await SignalRService.startConnection(connectionToken, sessionCookies || '');
         
         if (connected) {
-          console.log('✅ SignalR connected successfully');
           setConnectionStatus('connected');
         } else {
-          console.log('⚠️ SignalR connection failed, using fallback polling');
           setConnectionStatus('connected'); // Still mark as connected for polling
         }
       } else {
-        console.log('⚠️ No SignalR token, using polling only');
         setConnectionStatus('connected');
       }
       
     } catch (error) {
-      console.error('❌ Monitoring startup failed:', error);
+      console.error('Monitoring startup failed:', error);
       setConnectionStatus('failed');
-      // Don't show alert - just use polling
     }
-  };
-
+  }, [handleSignalRNotification]);
 
   // Stop monitoring
-  const stopMonitoring = async () => {
+  const stopMonitoring = useCallback(async () => {
     SignalRService.removeCallback(handleSignalRNotification);
     await SignalRService.stopConnection();
     setConnectionStatus('disconnected');
-  };
+  }, [handleSignalRNotification]);
 
   useEffect(() => {
-    startMonitoring();
-    fetchAttendanceData(); // Load initial data
+    let mounted = true;
+    let cleanup = null;
+    
+    const init = async () => {
+      if (mounted) {
+        await startMonitoring();
+        await fetchAttendanceData();
+      }
+    };
+    
+    init();
     
     return () => {
-      stopMonitoring();
+      mounted = false;
+      // Store cleanup function to be called synchronously
+      if (!cleanup) {
+        cleanup = stopMonitoring();
+      }
     };
-  }, []);
+  }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -368,5 +373,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+RealTimeMonitor.propTypes = {
+  employeeId: PropTypes.string.isRequired,
+  onClose: PropTypes.func,
+  onDataUpdate: PropTypes.func,
+};
 
 export default RealTimeMonitor;

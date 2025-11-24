@@ -1,5 +1,7 @@
 // services/ApiService.js
-const BASE_URL = "https://attendance.caraga.nia.gov.ph";
+import { API_CONFIG } from '../constants/config';
+
+const BASE_URL = API_CONFIG.BASE_URL;
 
 class ApiService {
   
@@ -108,33 +110,7 @@ class ApiService {
     return new Date();
   };
 
-  getSignalRToken = async () => {
-    try {
-      // Get the attendance page to extract SignalR token
-      const response = await fetch(`${BASE_URL}/Attendance`);
-      const html = await response.text();
-      
-      // Look for connection token in the page
-      const tokenPatterns = [
-        /connectionToken=([^";]+)/,
-        /SignalR\.ConnectionToken=([^";]+)/,
-        /"ConnectionToken":"([^"]+)"/
-      ];
-      
-      for (const pattern of tokenPatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          return match[1];
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error getting SignalR token:', error);
-      return null;
-    }
-  };
-  
+
   getSignalRToken = async () => {
     try {
       console.log('🔧 Fetching SignalR connection token...');

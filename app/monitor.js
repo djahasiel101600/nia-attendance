@@ -11,24 +11,24 @@ export default function MonitorScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const creds = await AuthService.getStoredCredentials();
-      if (!creds.employeeId) {
-        // Not logged in, redirect to login
+    const checkAuth = async () => {
+      try {
+        const creds = await AuthService.getStoredCredentials();
+        if (!creds.employeeId) {
+          // Not logged in, redirect to login
+          router.replace('/login');
+          return;
+        }
+        setEmployeeId(creds.employeeId);
+        setLoading(false);
+      } catch (error) {
+        console.error('Auth check failed:', error);
         router.replace('/login');
-        return;
       }
-      setEmployeeId(creds.employeeId);
-      setLoading(false);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.replace('/login');
-    }
-  };
+    };
+
+    checkAuth();
+  }, [router]);
 
   if (loading) {
     return (
