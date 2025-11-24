@@ -17,7 +17,6 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const fetchAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📡 Fetching fresh attendance data...');
       
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
       if (data && data.records) {
@@ -28,9 +27,8 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
       }
       
       setLastUpdate(new Date());
-      console.log(`✅ Loaded ${data?.records?.length || 0} attendance records`);
     } catch (error) {
-      console.error('❌ Error fetching attendance data:', error);
+      console.error('Error fetching attendance data:', error);
     } finally {
       setLoading(false);
     }
@@ -38,80 +36,60 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
 
   // Handle SignalR notifications
   const handleSignalRNotification = useCallback((signalType, data) => {
-    console.log(`🔔 SignalR Notification: ${signalType}`);
-    
     switch (signalType) {
       case 'NEW_DATA_AVAILABLE':
         setSignalCount(prev => prev + 1);
-        console.log('🎯 New attendance entry detected - refreshing data...');
         fetchAttendanceData();
         break;
         
       case 'CONNECTED':
         setConnectionStatus('connected');
-        console.log('✅ Connected to real-time notifications');
         fetchAttendanceData();
         break;
         
       case 'DISCONNECTED':
         setConnectionStatus('disconnected');
-        console.log('❌ Real-time notifications disconnected');
         break;
         
       case 'RECONNECTING':
         setConnectionStatus('reconnecting');
-        console.log('🔄 Reconnecting to notifications...');
         break;
         
       case 'CONNECTION_FAILED':
         setConnectionStatus('failed');
-        console.error('❌ Failed to connect to notifications');
         Alert.alert('Connection Failed', 'Real-time updates unavailable');
         break;
     }
   }, [fetchAttendanceData]);
 
-  // Start real-time monitoring - SIMPLIFIED
+  // Start real-time monitoring
   const startMonitoring = useCallback(async () => {
     try {
       setConnectionStatus('connecting');
       
-      console.log('🔍 Starting real-time monitoring...');
-      
-      // Since we know login works and API calls work, skip the test
-      console.log('✅ Skipping API test - login is working');
-      
       // Get session cookies for SignalR
       const sessionCookies = await AuthService.getSessionCookies();
-      console.log('🔍 Session cookies available:', sessionCookies ? 'Yes' : 'No');
       
       // Try SignalR connection
-      console.log('🔧 Attempting SignalR connection...');
       const connectionToken = await ApiService.getSignalRToken();
       
       if (connectionToken) {
-        console.log('🔧 SignalR token acquired');
-        
         SignalRService.addCallback(handleSignalRNotification);
         
         const connected = await SignalRService.startConnection(connectionToken, sessionCookies || '');
         
         if (connected) {
-          console.log('✅ SignalR connected successfully');
           setConnectionStatus('connected');
         } else {
-          console.log('⚠️ SignalR connection failed, using fallback polling');
           setConnectionStatus('connected'); // Still mark as connected for polling
         }
       } else {
-        console.log('⚠️ No SignalR token, using polling only');
         setConnectionStatus('connected');
       }
       
     } catch (error) {
-      console.error('❌ Monitoring startup failed:', error);
+      console.error('Monitoring startup failed:', error);
       setConnectionStatus('failed');
-      // Don't show alert - just use polling
     }
   }, [handleSignalRNotification]);
 

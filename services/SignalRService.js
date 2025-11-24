@@ -38,7 +38,6 @@ class SignalRService {
   buildWebSocketUrl(connectionToken) {
     // ASP.NET SignalR uses this format
     const url = `wss://${API_CONFIG.BASE_URL.replace(/^https?:\/\//, '')}/signalr/connect?transport=webSockets&clientProtocol=${API_CONFIG.SIGNALR_CLIENT_PROTOCOL}&connectionToken=${encodeURIComponent(connectionToken)}&connectionData=${encodeURIComponent(`[{"name":"${API_CONFIG.SIGNALR_HUB_NAME}"}]`)}&tid=${Math.floor(Math.random() * 10)}`;
-    console.log('🔧 WebSocket URL:', url);
     return url;
   }
 
@@ -62,12 +61,10 @@ class SignalRService {
   handleMessage(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log('📨 SignalR message:', data);
       
       if (data.M) { // Messages array
         data.M.forEach(message => {
           if (message.H === API_CONFIG.SIGNALR_HUB_NAME && message.M === 'update') {
-            console.log('🔔 BioHub update received');
             this.notifyCallbacks('NEW_DATA_AVAILABLE');
           }
         });
@@ -89,7 +86,6 @@ class SignalRService {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('✅ WebSocket connected');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         
@@ -102,7 +98,6 @@ class SignalRService {
       this.ws.onmessage = (event) => this.handleMessage(event);
       
       this.ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason);
         this.isConnected = false;
         this.notifyCallbacks('DISCONNECTED', { error: `Connection closed: ${event.code}` });
         
@@ -111,7 +106,7 @@ class SignalRService {
       };
       
       this.ws.onerror = (error) => {
-        console.error('🚨 WebSocket error:', error);
+        console.error('WebSocket error:', error);
         this.isConnected = false;
         this.notifyCallbacks('CONNECTION_FAILED', { error });
       };
@@ -130,15 +125,11 @@ class SignalRService {
       this.reconnectAttempts++;
       const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
       
-      console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-      
       setTimeout(() => {
         if (!this.isConnected) {
           this.startConnection(connectionToken, sessionCookies);
         }
       }, delay);
-    } else {
-      console.log('❌ Max reconnection attempts reached');
     }
   }
 
@@ -152,7 +143,6 @@ class SignalRService {
     }
     
     this.isConnected = false;
-    console.log('✅ SignalR connection stopped');
   }
 
   getStatus() {

@@ -5,26 +5,34 @@ import { API_CONFIG, STORAGE_KEYS } from '../constants/config';
 const BASE_URL = API_CONFIG.BASE_URL;
 const AUTH_BASE = API_CONFIG.AUTH_BASE_URL;
 
+/**
+ * Authentication service for handling user login and session management
+ */
 class AuthService {
   session = null;
   memoryCookies = null;
 
+  /**
+   * Authenticates a user with employee ID and password
+   * @param {string} employeeId - The employee's ID
+   * @param {string} password - The employee's password
+   * @returns {Promise<boolean>} True if login successful, false otherwise
+   */
   login = async (employeeId, password) => {
     try {
-      console.log('🔐 Attempting login...');
-      
       const defaultHeaders = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       };
 
       // Step 1: Get login page
-      console.log('📡 Getting login page...');
       const loginPageResponse = await fetch(`${AUTH_BASE}/Account/Login?ReturnUrl=${encodeURIComponent(BASE_URL + '/')}`, { 
         headers: defaultHeaders 
       });
       
-      console.log(`🔎 GET Login Page -> ${loginPageResponse.status}`);
+      if (!loginPageResponse.ok) {
+        throw new Error(`Failed to load login page: ${loginPageResponse.status}`);
+      }
       
       const html = await loginPageResponse.text();
 
@@ -44,15 +52,11 @@ class AuthService {
 
       const csrfToken = extractToken(html);
       if (!csrfToken) {
-        console.error('🚨 Security token not found');
+        console.error('Security token not found in login page');
         throw new Error('Security token not found');
       }
-
-      console.log('✅ CSRF token extracted');
       
       // Step 2: Perform login
-      console.log('📡 Performing login...');
-      
       const postData = `__RequestVerificationToken=${encodeURIComponent(csrfToken)}&EmployeeID=${encodeURIComponent(employeeId)}&Password=${encodeURIComponent(password)}&RememberMe=false`;
       
       const postHeaders = {
@@ -68,8 +72,6 @@ class AuthService {
         body: postData,
         redirect: 'manual'
       });
-
-      console.log(`🔎 POST Login -> ${loginResponse.status}`);
       
       const responseText = await loginResponse.text();
       
@@ -79,8 +81,6 @@ class AuthService {
                           responseText.includes('Dashboard');
       
       if (isSuccessful) {
-        console.log('✅ Login successful');
-        
         // Store only employee ID, not password
         await SecureStore.setItemAsync(STORAGE_KEYS.EMPLOYEE_ID, employeeId);
         
@@ -93,16 +93,19 @@ class AuthService {
         
         return true;
       } else {
-        console.log('❌ Login failed');
         return false;
       }
       
     } catch (error) {
-      console.error('🚨 Login error:', error);
+      console.error('Login error:', error.message);
       return false;
     }
   };
 
+  /**
+   * Logs out the current user and clears stored credentials
+   * @returns {Promise<void>}
+   */
   logout = async () => {
     await SecureStore.deleteItemAsync(STORAGE_KEYS.EMPLOYEE_ID);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.SESSION_COOKIES);
@@ -110,6 +113,10 @@ class AuthService {
     this.memoryCookies = null;
   };
 
+  /**
+   * Retrieves stored credentials from secure storage
+   * @returns {Promise<{employeeId: string | null}>} Object containing employee ID
+   */
   getStoredCredentials = async () => {
     try {
       const employeeId = await SecureStore.getItemAsync(STORAGE_KEYS.EMPLOYEE_ID);
@@ -119,6 +126,10 @@ class AuthService {
     }
   };
 
+  /**
+   * Retrieves stored session cookies
+   * @returns {Promise<string | null>} Session cookies or null
+   */
   getSessionCookies = async () => {
     try {
       const cookies = await SecureStore.getItemAsync(STORAGE_KEYS.SESSION_COOKIES);
@@ -131,12 +142,14 @@ class AuthService {
     }
   };
 
-  // SIMPLE API TEST - Just check if we can make any API call
+  /**
+   * Tests if the current user has API access
+   * @param {string} employeeId - The employee's ID
+   * @returns {Promise<boolean>} True if API is accessible, false otherwise
+   */
   testAccess = async (employeeId) => {
     try {
-      console.log('🧪 Testing API access with simple request...');
-      
-      // Use the same exact call as your working dashboard
+      // Use the same exact call as the working dashboard
       const response = await fetch(`${BASE_URL}/Attendance/IndexData/${new Date().getFullYear()}?month=${new Date().toLocaleString('default', { month: 'long' })}&eid=${employeeId}`, {
         method: 'POST',
         headers: {
@@ -146,15 +159,10 @@ class AuthService {
         body: 'draw=1&start=0&length=1' // Minimal payload
       });
       
-      console.log(`🧪 API test -> ${response.status}`);
-      
       // Consider it successful if we get any 2xx status
-      const success = response.status >= 200 && response.status < 300;
-      console.log('🧪 API access:', success ? 'SUCCESS' : `FAILED (${response.status})`);
-      
-      return success;
+      return response.status >= 200 && response.status < 300;
     } catch (error) {
-      console.error('🧪 API test error:', error);
+      console.error('API test error:', error.message);
       return false;
     }
   };

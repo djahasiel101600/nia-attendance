@@ -17,7 +17,6 @@ export default function Login() {
         const creds = await AuthService.getStoredCredentials();
         if (creds.employeeId) {
           // User is already logged in, redirect to dashboard
-          console.log('✅ User already logged in, redirecting...');
           router.replace('/dashboard');
         } else {
           setCheckingAuth(false);
