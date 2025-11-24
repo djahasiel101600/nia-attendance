@@ -117,6 +117,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
 
   useEffect(() => {
     let mounted = true;
+    let cleanup = null;
     
     const init = async () => {
       if (mounted) {
@@ -129,8 +130,10 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
     
     return () => {
       mounted = false;
-      // Cleanup async
-      stopMonitoring();
+      // Store cleanup function to be called synchronously
+      if (!cleanup) {
+        cleanup = stopMonitoring();
+      }
     };
   }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
 

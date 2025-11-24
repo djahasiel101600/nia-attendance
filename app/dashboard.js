@@ -15,7 +15,10 @@ export default function Dashboard() {
   const [showRealTimeMonitor, setShowRealTimeMonitor] = useState(false);
 
   const refresh = async () => {
-    if (!employeeId) return;
+    if (!employeeId) {
+      console.warn('Cannot refresh: Employee ID not set');
+      return;
+    }
     
     setLoading(true);
     try {
@@ -24,7 +27,7 @@ export default function Dashboard() {
         setRecords(data.records);
       }
     } catch (e) {
-      console.warn('Refresh error', e);
+      console.error('Refresh error:', e);
     } finally {
       setLoading(false);
     }

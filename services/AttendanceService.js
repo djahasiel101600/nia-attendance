@@ -118,7 +118,7 @@ class AttendanceService {
       });
 
       if (!resp.ok) {
-        throw new Error(`Network error: ${resp.status}`);
+        throw new Error(`Failed to fetch attendance data: ${resp.status}`);
       }
 
       const json = await resp.json();
