@@ -1,4 +1,5 @@
-// components/RealTimeMonitor.js - UPDATED
+// components/RealTimeMonitor.js
+import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ApiService from '../services/ApiService';
@@ -6,6 +7,13 @@ import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
 import SignalRService from '../services/SignalRService';
 
+/**
+ * Real-time monitoring component for attendance data
+ * @param {Object} props - Component props
+ * @param {string} props.employeeId - Employee ID to monitor
+ * @param {Function} [props.onClose] - Callback when monitor is closed
+ * @param {Function} [props.onDataUpdate] - Callback when data is updated
+ */
 const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [attendanceData, setAttendanceData] = useState([]);
@@ -345,5 +353,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+RealTimeMonitor.propTypes = {
+  employeeId: PropTypes.string.isRequired,
+  onClose: PropTypes.func,
+  onDataUpdate: PropTypes.func,
+};
 
 export default RealTimeMonitor;

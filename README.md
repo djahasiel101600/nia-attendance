@@ -1,8 +1,34 @@
-# Welcome to your Expo app 👋
+# NIA Attendance App 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native mobile application built with Expo for managing NIA (National Irrigation Administration) attendance tracking with real-time monitoring capabilities.
 
-## Get started
+## Features
+
+- 🔐 Secure authentication with NIA accounts
+- 📊 Real-time attendance monitoring via SignalR
+- 📱 Cross-platform support (iOS, Android, Web)
+- 🔄 Auto-refresh attendance records
+- 🌡️ Temperature tracking
+- 📈 Attendance statistics and filtering
+
+## Tech Stack
+
+- **Framework**: Expo (~54.0.25)
+- **Language**: JavaScript/TypeScript
+- **UI**: React Native (0.81.5)
+- **Navigation**: Expo Router
+- **Real-time**: SignalR WebSocket
+- **Storage**: Expo SecureStore
+
+## Get Started
+
+### Prerequisites
+
+- Node.js 16+ installed
+- npm or yarn package manager
+- Expo CLI (will be installed with dependencies)
+
+### Installation
 
 1. Install dependencies
 
@@ -10,41 +36,85 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Start the development server
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+In the output, you'll find options to open the app in:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Development Scripts
 
-## Get a fresh project
+- `npm start` - Start Expo development server
+- `npm run android` - Run on Android
+- `npm run ios` - Run on iOS
+- `npm run web` - Run on web
+- `npm run lint` - Run ESLint
 
-When you're ready, run:
+## Project Structure
 
-```bash
-npm run reset-project
+```
+nia-attendance/
+├── app/                    # App screens and navigation
+│   ├── (tabs)/            # Tab navigation screens
+│   ├── _layout.tsx        # Root layout
+│   ├── index.js           # Splash/auth check screen
+│   ├── login.js           # Login screen
+│   ├── dashboard.js       # Main dashboard
+│   └── monitor.js         # Real-time monitor screen
+├── components/            # Reusable components
+│   ├── RealTimeMonitor.js # Real-time attendance monitor
+│   └── ui/               # UI components
+├── constants/            # App constants
+│   ├── config.ts         # Configuration constants
+│   └── theme.ts          # Theme configuration
+├── services/             # Business logic services
+│   ├── AuthService.js    # Authentication service
+│   ├── AttendanceService.js # Attendance data service
+│   ├── SignalRService.js # Real-time WebSocket service
+│   └── ApiService.js     # API utilities
+├── types/                # TypeScript type definitions
+└── assets/              # Images, fonts, etc.
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Configuration
 
-## Learn more
+App configuration is centralized in `constants/config.ts`:
 
-To learn more about developing your project with Expo, look at the following resources:
+```typescript
+export const API_CONFIG = {
+  BASE_URL: 'https://attendance.caraga.nia.gov.ph',
+  AUTH_BASE_URL: 'https://accounts.nia.gov.ph',
+  SIGNALR_HUB_NAME: 'biohub',
+  SIGNALR_CLIENT_PROTOCOL: '1.5',
+};
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Security Features
 
-## Join the community
+- ✅ Secure credential storage using Expo SecureStore
+- ✅ No plain-text password storage (session-based auth)
+- ✅ CSRF token validation for API requests
+- ✅ Secure WebSocket connections (WSS)
 
-Join our community of developers creating universal apps.
+## Learn More
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+To learn more about developing with Expo:
+
+- [Expo documentation](https://docs.expo.dev/)
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/)
+- [Expo Router documentation](https://docs.expo.dev/router/introduction)
+
+## Community
+
+Join the Expo community:
+
+- [Expo on GitHub](https://github.com/expo/expo)
+- [Discord community](https://chat.expo.dev)
+
