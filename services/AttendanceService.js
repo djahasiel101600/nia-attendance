@@ -1,7 +1,8 @@
 //services/AttendanceService.js
+import { API_CONFIG, APP_CONFIG } from '../constants/config';
 import AuthService from './AuthService';
 
-const BASE_URL = 'https://attendance.caraga.nia.gov.ph';
+const BASE_URL = API_CONFIG.BASE_URL;
 
 function parseNetDate(netDateString) {
   try {
@@ -17,7 +18,7 @@ function parseNetDate(netDateString) {
 
 class AttendanceService {
   getAttendanceData = async (employeeId, opts = {}) => {
-    const { length = 50, year, month } = opts;
+    const { length = APP_CONFIG.DEFAULT_RECORDS_LENGTH, year, month } = opts;
     try {
       // Reuse session cookies stored by AuthService if available
       const cookies = await AuthService.getSessionCookies();

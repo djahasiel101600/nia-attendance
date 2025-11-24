@@ -1,8 +1,9 @@
-// services/AuthService.js - FIXED API TEST
+// services/AuthService.js
 import * as SecureStore from 'expo-secure-store';
+import { API_CONFIG, STORAGE_KEYS } from '../constants/config';
 
-const BASE_URL = "https://attendance.caraga.nia.gov.ph";
-const AUTH_BASE = 'https://accounts.nia.gov.ph';
+const BASE_URL = API_CONFIG.BASE_URL;
+const AUTH_BASE = API_CONFIG.AUTH_BASE_URL;
 
 class AuthService {
   session = null;
@@ -80,14 +81,13 @@ class AuthService {
       if (isSuccessful) {
         console.log('✅ Login successful');
         
-        // Store credentials
-        await SecureStore.setItemAsync('employeeId', employeeId);
-        await SecureStore.setItemAsync('password', password);
+        // Store only employee ID, not password
+        await SecureStore.setItemAsync(STORAGE_KEYS.EMPLOYEE_ID, employeeId);
         
         // Try to get cookies if available
         const cookies = loginResponse.headers.get('set-cookie') || loginResponse.headers.get('Set-Cookie') || '';
         if (cookies) {
-          await SecureStore.setItemAsync('sessionCookies', cookies);
+          await SecureStore.setItemAsync(STORAGE_KEYS.SESSION_COOKIES, cookies);
           this.memoryCookies = cookies;
         }
         
@@ -104,26 +104,24 @@ class AuthService {
   };
 
   logout = async () => {
-    await SecureStore.deleteItemAsync('employeeId');
-    await SecureStore.deleteItemAsync('password');
-    await SecureStore.deleteItemAsync('sessionCookies');
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.EMPLOYEE_ID);
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.SESSION_COOKIES);
     this.session = null;
     this.memoryCookies = null;
   };
 
   getStoredCredentials = async () => {
     try {
-      const employeeId = await SecureStore.getItemAsync('employeeId');
-      const password = await SecureStore.getItemAsync('password');
-      return { employeeId, password };
+      const employeeId = await SecureStore.getItemAsync(STORAGE_KEYS.EMPLOYEE_ID);
+      return { employeeId };
     } catch (error) {
-      return { employeeId: null, password: null };
+      return { employeeId: null };
     }
   };
 
   getSessionCookies = async () => {
     try {
-      const cookies = await SecureStore.getItemAsync('sessionCookies');
+      const cookies = await SecureStore.getItemAsync(STORAGE_KEYS.SESSION_COOKIES);
       if (cookies) {
         return cookies;
       }

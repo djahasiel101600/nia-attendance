@@ -8,27 +8,28 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuthentication();
-  }, []);
-
-  const checkAuthentication = async () => {
-    try {
-      const { employeeId } = await AuthService.getStoredCredentials();
-      
-      // Small delay for better UX
-      setTimeout(() => {
-        if (employeeId) {
-          router.replace('/dashboard');
-        } else {
-          router.replace('/login');
-        }
+    const checkAuthentication = async () => {
+      try {
+        const { employeeId } = await AuthService.getStoredCredentials();
+        
+        // Small delay for better UX
+        setTimeout(() => {
+          if (employeeId) {
+            router.replace('/dashboard');
+          } else {
+            router.replace('/login');
+          }
+          setIsLoading(false);
+        }, 1000);
+      } catch (_error) {
+        // Ignore error and redirect to login
+        router.replace('/login');
         setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      router.replace('/login');
-      setIsLoading(false);
-    }
-  };
+      }
+    };
+
+    checkAuthentication();
+  }, [router]);
 
   if (isLoading) {
     return (

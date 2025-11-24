@@ -1,4 +1,6 @@
-// services/SignalRService.js - WEB SOCKET DIRECT APPROACH
+// services/SignalRService.js
+import { API_CONFIG, APP_CONFIG } from '../constants/config';
+
 class SignalRService {
   constructor() {
     this.ws = null;
@@ -6,7 +8,7 @@ class SignalRService {
     this.callbacks = [];
     this.messageId = 0;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = APP_CONFIG.MAX_RECONNECT_ATTEMPTS;
   }
 
   addCallback(callback) {
@@ -35,7 +37,7 @@ class SignalRService {
   // Build WebSocket URL for ASP.NET SignalR
   buildWebSocketUrl(connectionToken) {
     // ASP.NET SignalR uses this format
-    const url = `wss://attendance.caraga.nia.gov.ph/signalr/connect?transport=webSockets&clientProtocol=1.5&connectionToken=${encodeURIComponent(connectionToken)}&connectionData=${encodeURIComponent('[{"name":"biohub"}]')}&tid=${Math.floor(Math.random() * 10)}`;
+    const url = `wss://${API_CONFIG.BASE_URL.replace(/^https?:\/\//, '')}/signalr/connect?transport=webSockets&clientProtocol=${API_CONFIG.SIGNALR_CLIENT_PROTOCOL}&connectionToken=${encodeURIComponent(connectionToken)}&connectionData=${encodeURIComponent(`[{"name":"${API_CONFIG.SIGNALR_HUB_NAME}"}]`)}&tid=${Math.floor(Math.random() * 10)}`;
     console.log('🔧 WebSocket URL:', url);
     return url;
   }
@@ -64,7 +66,7 @@ class SignalRService {
       
       if (data.M) { // Messages array
         data.M.forEach(message => {
-          if (message.H === 'biohub' && message.M === 'update') {
+          if (message.H === API_CONFIG.SIGNALR_HUB_NAME && message.M === 'update') {
             console.log('🔔 BioHub update received');
             this.notifyCallbacks('NEW_DATA_AVAILABLE');
           }
@@ -92,7 +94,7 @@ class SignalRService {
         this.reconnectAttempts = 0;
         
         // Send initial join message
-        this.sendMessage('biohub', 'Join');
+        this.sendMessage(API_CONFIG.SIGNALR_HUB_NAME, 'Join');
         
         this.notifyCallbacks('CONNECTED');
       };

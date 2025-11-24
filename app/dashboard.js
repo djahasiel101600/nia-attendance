@@ -14,24 +14,9 @@ export default function Dashboard() {
   const [isLive, setIsLive] = useState(false);
   const [showRealTimeMonitor, setShowRealTimeMonitor] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const creds = await AuthService.getStoredCredentials();
-      if (!creds.employeeId || !creds.password) {
-        router.replace('/login');
-        return;
-      }
-      setEmployeeId(creds.employeeId);
-      await refresh();
-      setLoading(false);
-    })();
-
-    return () => {
-      // Cleanup will be handled by RealTimeMonitor component
-    };
-  }, []);
-
   const refresh = async () => {
+    if (!employeeId) return;
+    
     setLoading(true);
     try {
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
@@ -44,6 +29,36 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const initDashboard = async () => {
+      const creds = await AuthService.getStoredCredentials();
+      if (!creds.employeeId) {
+        router.replace('/login');
+        return;
+      }
+      setEmployeeId(creds.employeeId);
+      
+      // Initial data fetch
+      setLoading(true);
+      try {
+        const data = await AttendanceService.getAttendanceData(creds.employeeId, { length: 50 });
+        if (data && data.records) {
+          setRecords(data.records);
+        }
+      } catch (e) {
+        console.warn('Initial fetch error', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initDashboard();
+
+    return () => {
+      // Cleanup will be handled by RealTimeMonitor component
+    };
+  }, [router]);
 
   const onRefresh = async () => {
     await refresh();

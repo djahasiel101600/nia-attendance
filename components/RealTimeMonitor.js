@@ -14,7 +14,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const [signalCount, setSignalCount] = useState(0);
 
   // Fetch actual attendance data from API
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
       console.log('📡 Fetching fresh attendance data...');
@@ -34,7 +34,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeId, onDataUpdate]);
 
   // Handle SignalR notifications
   const handleSignalRNotification = useCallback((signalType, data) => {
@@ -69,10 +69,10 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
         Alert.alert('Connection Failed', 'Real-time updates unavailable');
         break;
     }
-  }, [employeeId]);
+  }, [fetchAttendanceData]);
 
   // Start real-time monitoring - SIMPLIFIED
-  const startMonitoring = async () => {
+  const startMonitoring = useCallback(async () => {
     try {
       setConnectionStatus('connecting');
       
@@ -113,15 +113,14 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
       setConnectionStatus('failed');
       // Don't show alert - just use polling
     }
-  };
-
+  }, [handleSignalRNotification]);
 
   // Stop monitoring
-  const stopMonitoring = async () => {
+  const stopMonitoring = useCallback(async () => {
     SignalRService.removeCallback(handleSignalRNotification);
     await SignalRService.stopConnection();
     setConnectionStatus('disconnected');
-  };
+  }, [handleSignalRNotification]);
 
   useEffect(() => {
     startMonitoring();
@@ -130,7 +129,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
     return () => {
       stopMonitoring();
     };
-  }, []);
+  }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
