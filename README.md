@@ -36,7 +36,14 @@ A React Native mobile application built with Expo for managing NIA (National Irr
    npm install
    ```
 
-2. Start the development server
+2. Configure environment variables (optional)
+
+   ```bash
+   cp .env.example .env
+   # Edit .env to customize API endpoints if needed
+   ```
+
+3. Start the development server
 
    ```bash
    npx expo start
@@ -89,12 +96,30 @@ App configuration is centralized in `constants/config.ts`:
 
 ```typescript
 export const API_CONFIG = {
-  BASE_URL: 'https://attendance.caraga.nia.gov.ph',
-  AUTH_BASE_URL: 'https://accounts.nia.gov.ph',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://attendance.caraga.nia.gov.ph',
+  AUTH_BASE_URL: process.env.EXPO_PUBLIC_AUTH_BASE_URL || 'https://accounts.nia.gov.ph',
   SIGNALR_HUB_NAME: 'biohub',
   SIGNALR_CLIENT_PROTOCOL: '1.5',
 };
 ```
+
+### Environment Variables
+
+You can override default API endpoints by creating a `.env` file in the project root:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit with your values
+EXPO_PUBLIC_API_BASE_URL=https://attendance.caraga.nia.gov.ph
+EXPO_PUBLIC_AUTH_BASE_URL=https://accounts.nia.gov.ph
+```
+
+This is useful for:
+- Testing with local development servers
+- Switching between staging and production environments
+- Running integration tests
 
 ## Security Features
 

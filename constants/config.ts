@@ -1,8 +1,10 @@
 // Configuration constants for the NIA Attendance application
 
+// API Configuration
+// These can be overridden via environment variables in production
 export const API_CONFIG = {
-  BASE_URL: 'https://attendance.caraga.nia.gov.ph',
-  AUTH_BASE_URL: 'https://accounts.nia.gov.ph',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://attendance.caraga.nia.gov.ph',
+  AUTH_BASE_URL: process.env.EXPO_PUBLIC_AUTH_BASE_URL || 'https://accounts.nia.gov.ph',
   SIGNALR_HUB_NAME: 'biohub',
   SIGNALR_CLIENT_PROTOCOL: '1.5',
 } as const;

@@ -129,6 +129,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
     
     return () => {
       mounted = false;
+      // Cleanup async
       stopMonitoring();
     };
   }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
