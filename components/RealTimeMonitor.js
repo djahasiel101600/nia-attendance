@@ -1,6 +1,6 @@
 // components/RealTimeMonitor.js
 import PropTypes from 'prop-types';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ApiService from '../services/ApiService';
 import AttendanceService from '../services/AttendanceService';
@@ -20,6 +20,13 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [signalCount, setSignalCount] = useState(0);
+  
+  // Use ref to store the latest onDataUpdate callback without triggering re-renders
+  const onDataUpdateRef = useRef(onDataUpdate);
+  
+  useEffect(() => {
+    onDataUpdateRef.current = onDataUpdate;
+  }, [onDataUpdate]);
 
   // Fetch actual attendance data from API
   const fetchAttendanceData = useCallback(async () => {
@@ -29,8 +36,8 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
       if (data && data.records) {
         setAttendanceData(data.records);
-        if (onDataUpdate) {
-          onDataUpdate(data.records);
+        if (onDataUpdateRef.current) {
+          onDataUpdateRef.current(data.records);
         }
       }
       
@@ -40,7 +47,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
     } finally {
       setLoading(false);
     }
-  }, [employeeId, onDataUpdate]);
+  }, [employeeId]);
 
   // Handle SignalR notifications
   const handleSignalRNotification = useCallback((signalType, data) => {
@@ -109,10 +116,19 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   }, [handleSignalRNotification]);
 
   useEffect(() => {
-    startMonitoring();
-    fetchAttendanceData(); // Load initial data
+    let mounted = true;
+    
+    const init = async () => {
+      if (mounted) {
+        await startMonitoring();
+        await fetchAttendanceData();
+      }
+    };
+    
+    init();
     
     return () => {
+      mounted = false;
       stopMonitoring();
     };
   }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
