@@ -85,8 +85,8 @@ export default function Dashboard() {
   };
 
   // Calculate stats
+  const today = new Date().toDateString();
   const todayRecords = records.filter(record => {
-    const today = new Date().toDateString();
     return new Date(record.date_time).toDateString() === today;
   });
 
@@ -94,7 +94,6 @@ export default function Dashboard() {
 
   const renderItem = ({ item }) => {
     // Check if this record is from today
-    const today = new Date().toDateString();
     const isToday = new Date(item.date_time).toDateString() === today;
     
     return (

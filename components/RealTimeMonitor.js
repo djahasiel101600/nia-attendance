@@ -195,33 +195,35 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
             📊 Live Attendance ({attendanceData.length} records)
           </Text>
           
-          {attendanceData.slice(0, 10).map((record, index) => {
-            // Check if this record is from today
+          {(() => {
             const today = new Date().toDateString();
-            const isToday = new Date(record.date_time).toDateString() === today;
-            
-            return (
-              <View key={index} style={[styles.recordItem, isToday && styles.recordItemToday]}>
-                <View style={styles.recordHeader}>
-                  <Text style={styles.employeeName}>{record.employee_name}</Text>
-                  <View style={[
-                    styles.statusBadge,
-                    record.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError
-                  ]}>
-                    <Text style={styles.badgeText}>
-                      {record.status === 'ACCESS_GRANTED' ? '✅' : '❌'}
-                    </Text>
+            return attendanceData.slice(0, 10).map((record, index) => {
+              // Check if this record is from today
+              const isToday = new Date(record.date_time).toDateString() === today;
+              
+              return (
+                <View key={index} style={[styles.recordItem, isToday && styles.recordItemToday]}>
+                  <View style={styles.recordHeader}>
+                    <Text style={styles.employeeName}>{record.employee_name}</Text>
+                    <View style={[
+                      styles.statusBadge,
+                      record.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError
+                    ]}>
+                      <Text style={styles.badgeText}>
+                        {record.status === 'ACCESS_GRANTED' ? '✅' : '❌'}
+                      </Text>
+                    </View>
                   </View>
+                  <Text style={styles.recordTime}>
+                    🕒 {new Date(record.date_time).toLocaleTimeString()}
+                  </Text>
+                  {record.temperature && (
+                    <Text style={styles.recordTemp}>🌡️ {record.temperature}°C</Text>
+                  )}
                 </View>
-                <Text style={styles.recordTime}>
-                  🕒 {new Date(record.date_time).toLocaleTimeString()}
-                </Text>
-                {record.temperature && (
-                  <Text style={styles.recordTemp}>🌡️ {record.temperature}°C</Text>
-                )}
-              </View>
-            );
-          })}
+              );
+            });
+          })()}
           
           {attendanceData.length === 0 && !loading && (
             <Text style={styles.emptyText}>No records found</Text>
