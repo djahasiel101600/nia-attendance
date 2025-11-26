@@ -92,20 +92,26 @@ export default function Dashboard() {
 
   const deniedRecords = records.filter(record => record.status === 'ACCESS_DENIED');
 
-  const renderItem = ({ item }) => (
-    <View style={styles.item}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={styles.name}>{item.employee_name}</Text>
-        <View style={[styles.badge, item.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError]}>
-          <Text style={styles.badgeText}>{item.status === 'ACCESS_GRANTED' ? 'GRANTED' : 'DENIED'}</Text>
+  const renderItem = ({ item }) => {
+    // Check if this record is from today
+    const today = new Date().toDateString();
+    const isToday = new Date(item.date_time).toDateString() === today;
+    
+    return (
+      <View style={[styles.item, isToday && styles.itemToday]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={styles.name}>{item.employee_name}</Text>
+          <View style={[styles.badge, item.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError]}>
+            <Text style={styles.badgeText}>{item.status === 'ACCESS_GRANTED' ? 'GRANTED' : 'DENIED'}</Text>
+          </View>
         </View>
+        <Text style={styles.meta}>{item.date_time_string} · {item.machine_name}</Text>
+        {item.temperature && (
+          <Text style={styles.meta}>🌡️ {item.temperature}°C</Text>
+        )}
       </View>
-      <Text style={styles.meta}>{item.date_time_string} · {item.machine_name}</Text>
-      {item.temperature && (
-        <Text style={styles.meta}>🌡️ {item.temperature}°C</Text>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -195,6 +201,7 @@ const styles = StyleSheet.create({
   controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   subtitle: { color: '#aaa' },
   item: { padding: 12, backgroundColor: '#121212', marginBottom: 8, borderRadius: 8 },
+  itemToday: { backgroundColor: '#1a2a1a', borderLeftWidth: 4, borderLeftColor: '#00ff88' },
   name: { color: '#fff', fontSize: 16, fontWeight: '600' },
   meta: { color: '#aaa', marginTop: 4 },
   badge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
