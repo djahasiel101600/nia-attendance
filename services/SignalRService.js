@@ -60,11 +60,20 @@ class SignalRService {
   // Handle WebSocket messages
   handleMessage(event) {
     try {
-      const data = JSON.parse(event.data);
-      
+      const raw = event.data;
+      // Ignore keepalive pings (e.g. "0" every ~10s) and non-JSON
+      if (raw === '' || raw === '0' || raw === 0) return;
+
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!data || typeof data !== 'object') return;
+
       if (data.M) { // Messages array
         data.M.forEach(message => {
-          if (message.H === API_CONFIG.SIGNALR_HUB_NAME && message.M === 'update') {
+          const hub = (message.H || '').toString();
+          const method = (message.M || '').toString();
+          const expectedHub = (API_CONFIG.SIGNALR_HUB_NAME || '').toString();
+          if (hub.toLowerCase() === expectedHub.toLowerCase() && method.toLowerCase() === 'update') {
+            console.log('📡 SignalR: Attendance update received');
             this.notifyCallbacks('NEW_DATA_AVAILABLE');
           }
         });
@@ -82,15 +91,18 @@ class SignalRService {
       }
 
       const wsUrl = this.buildWebSocketUrl(connectionToken);
+      console.log('🔌 SignalR: Opening WebSocket...');
       
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
         this.isConnected = true;
         this.reconnectAttempts = 0;
+        console.log('✅ SignalR: WebSocket connected');
         
         // Send initial join message
         this.sendMessage(API_CONFIG.SIGNALR_HUB_NAME, 'Join');
+        console.log('📤 SignalR: Join sent');
         
         this.notifyCallbacks('CONNECTED');
       };
@@ -99,6 +111,7 @@ class SignalRService {
       
       this.ws.onclose = (event) => {
         this.isConnected = false;
+        console.log('❌ SignalR: WebSocket closed', event.code, event.reason || '');
         this.notifyCallbacks('DISCONNECTED', { error: `Connection closed: ${event.code}` });
         
         // Attempt reconnect
@@ -106,14 +119,14 @@ class SignalRService {
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ SignalR: WebSocket error', error);
         this.isConnected = false;
         this.notifyCallbacks('CONNECTION_FAILED', { error });
       };
       
       return true;
     } catch (error) {
-      console.error('Error starting WebSocket connection:', error);
+      console.error('❌ SignalR: Failed to start WebSocket', error);
       this.notifyCallbacks('CONNECTION_FAILED', { error });
       return false;
     }
@@ -123,8 +136,9 @@ class SignalRService {
   attemptReconnect(connectionToken, sessionCookies) {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
+      this.notifyCallbacks('RECONNECTING');
       const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
-      
+
       setTimeout(() => {
         if (!this.isConnected) {
           this.startConnection(connectionToken, sessionCookies);

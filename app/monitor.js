@@ -41,7 +41,13 @@ export default function MonitorScreen() {
 
   return (
     <View style={styles.container}>
-      <RealTimeMonitor employeeId={employeeId} />
+      <RealTimeMonitor
+        employeeId={employeeId}
+        onSessionExpired={async () => {
+          await AuthService.logout();
+          router.replace('/login');
+        }}
+      />
     </View>
   );
 }

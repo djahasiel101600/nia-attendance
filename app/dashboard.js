@@ -1,6 +1,6 @@
 // app/dashboard.js
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RealTimeMonitor from '../components/RealTimeMonitor';
 import AttendanceService from '../services/AttendanceService';
@@ -19,10 +19,15 @@ export default function Dashboard() {
       console.warn('Cannot refresh: Employee ID not set');
       return;
     }
-    
+
     setLoading(true);
     try {
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
+      if (data?.statusCode === 401 || data?.statusCode === 403) {
+        await AuthService.logout();
+        router.replace('/login');
+        return;
+      }
       if (data && data.records) {
         setRecords(data.records);
       }
@@ -41,11 +46,16 @@ export default function Dashboard() {
         return;
       }
       setEmployeeId(creds.employeeId);
-      
-      // Initial data fetch
+
+      // Initial data fetch; redirect to login if session expired
       setLoading(true);
       try {
         const data = await AttendanceService.getAttendanceData(creds.employeeId, { length: 50 });
+        if (data?.statusCode === 401 || data?.statusCode === 403) {
+          await AuthService.logout();
+          router.replace('/login');
+          return;
+        }
         if (data && data.records) {
           setRecords(data.records);
         }
@@ -62,6 +72,15 @@ export default function Dashboard() {
       // Cleanup will be handled by RealTimeMonitor component
     };
   }, [router]);
+
+  // Refetch when screen gains focus so list is not stale (e.g. after navigating back)
+  useFocusEffect(
+    useCallback(() => {
+      if (employeeId && !showRealTimeMonitor) {
+        refresh();
+      }
+    }, [employeeId, showRealTimeMonitor])
+  );
 
   const onRefresh = async () => {
     await refresh();
@@ -125,6 +144,10 @@ export default function Dashboard() {
           onDataUpdate={(newRecords) => {
             // Update the main records when real-time data changes
             setRecords(newRecords);
+          }}
+          onSessionExpired={async () => {
+            await AuthService.logout();
+            router.replace('/login');
           }}
         />
       ) : (

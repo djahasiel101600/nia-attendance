@@ -143,6 +143,39 @@ class AuthService {
   };
 
   /**
+   * Validates that the stored session is still accepted by the server.
+   * Uses a minimal authenticated request (with cookies). Call after finding stored employeeId.
+   * @returns {Promise<boolean>} True if session is valid, false if expired or invalid
+   */
+  validateSession = async () => {
+    try {
+      const employeeId = await SecureStore.getItemAsync(STORAGE_KEYS.EMPLOYEE_ID);
+      const cookies = await this.getSessionCookies();
+      if (!employeeId) return false;
+
+      const url = `${BASE_URL}/Attendance/IndexData/${new Date().getFullYear()}?month=${encodeURIComponent(new Date().toLocaleString('default', { month: 'long' }))}&eid=${encodeURIComponent(employeeId)}`;
+      const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': `${BASE_URL}/Attendance`,
+        'Cookie': cookies || '',
+      };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: 'draw=1&start=0&length=1',
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        return false;
+      }
+      return response.ok;
+    } catch (error) {
+      console.warn('Session validation failed:', error?.message);
+      return false;
+    }
+  };
+
+  /**
    * Tests if the current user has API access
    * @param {string} employeeId - The employee's ID
    * @returns {Promise<boolean>} True if API is accessible, false otherwise

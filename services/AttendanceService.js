@@ -32,7 +32,7 @@ class AttendanceService {
    * @param {number} [opts.length] - Number of records to fetch
    * @param {number} [opts.year] - Year to fetch data for
    * @param {string} [opts.month] - Month to fetch data for
-   * @returns {Promise<{records: Array, total_records: number} | null>} Attendance data or null on error
+   * @returns {Promise<{records: Array, total_records: number, statusCode?: number} | null>} Attendance data; statusCode 401/403 when session expired; null on other error
    */
   getAttendanceData = async (employeeId, opts = {}) => {
     const { length = APP_CONFIG.DEFAULT_RECORDS_LENGTH, year, month } = opts;
@@ -118,7 +118,11 @@ class AttendanceService {
       });
 
       if (!resp.ok) {
-        throw new Error(`Failed to fetch attendance data: ${resp.status}`);
+        const statusCode = resp.status;
+        if (statusCode === 401 || statusCode === 403) {
+          return { records: [], total_records: 0, statusCode };
+        }
+        throw new Error(`Failed to fetch attendance data: ${statusCode}`);
       }
 
       const json = await resp.json();

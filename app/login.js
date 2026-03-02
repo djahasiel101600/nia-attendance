@@ -1,8 +1,10 @@
 // app/login.js
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AuthService from '../services/AuthService';
+
+const isWeb = Platform.OS === 'web';
 
 export default function Login() {
   const router = useRouter();
@@ -45,7 +47,18 @@ export default function Login() {
         alert('Login failed. Please check your credentials.');
       }
     } catch (error) {
-      alert('Login error: ' + error.message);
+      const msg = error?.message || String(error);
+      const isCorsOrNetwork = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS');
+      if (isWeb && isCorsOrNetwork) {
+        alert(
+          'Login is not supported in the browser due to security restrictions (CORS).\n\n' +
+          'Please use the mobile app instead:\n' +
+          '• Install Expo Go on your phone and open this project, or\n' +
+          '• Run the app on an Android/iOS device or emulator.'
+        );
+      } else {
+        alert('Login error: ' + msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -62,6 +75,14 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
+      {isWeb && (
+        <View style={styles.webNotice}>
+          <Text style={styles.webNoticeTitle}>⚠️ Browser not supported for login</Text>
+          <Text style={styles.webNoticeText}>
+            NIA login and attendance APIs do not allow requests from the browser (CORS). Use the mobile app: Expo Go on your phone, or an Android/iOS device/emulator.
+          </Text>
+        </View>
+      )}
       <Text style={styles.title}>NIA Attendance</Text>
       <Text style={styles.subtitle}>Login to continue</Text>
       
@@ -147,5 +168,24 @@ const styles = StyleSheet.create({
     color: '#00ff88',
     marginTop: 16,
     fontSize: 16,
+  },
+  webNotice: {
+    backgroundColor: '#2a2a0a',
+    borderWidth: 1,
+    borderColor: '#666',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+  },
+  webNoticeTitle: {
+    color: '#ffaa00',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  webNoticeText: {
+    color: '#aaa',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

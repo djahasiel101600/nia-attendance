@@ -1,5 +1,6 @@
 // services/ApiService.js
 import { API_CONFIG } from '../constants/config';
+import AuthService from './AuthService';
 
 const BASE_URL = API_CONFIG.BASE_URL;
 
@@ -114,13 +115,16 @@ class ApiService {
   getSignalRToken = async () => {
     try {
       console.log('🔧 Fetching SignalR connection token...');
-      
-      // Method 1: Try to extract from attendance page cookies
+      const sessionCookies = await AuthService.getSessionCookies();
+      const cookieHeader = sessionCookies ? { 'Cookie': sessionCookies } : {};
+
+      // Method 1: Try to extract from attendance page cookies (with auth)
       const response = await fetch(`${BASE_URL}/Attendance`, {
         method: 'GET',
         headers: {
           'Referer': `${BASE_URL}/Attendance`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          ...cookieHeader
         }
       });
 
@@ -146,7 +150,7 @@ class ApiService {
 
       // Method 2: Try SignalR negotiation
       console.log('🔄 Trying SignalR negotiation...');
-      return await this._trySignalRNegotiation();
+      return await this._trySignalRNegotiation(sessionCookies);
       
     } catch (error) {
       console.error('🚨 Error getting SignalR token:', error);
@@ -154,22 +158,25 @@ class ApiService {
     }
   };
 
-  _trySignalRNegotiation = async () => {
+  _trySignalRNegotiation = async (sessionCookies = null) => {
     try {
       const negotiateUrl = `${BASE_URL}/signalr/negotiate`;
-      
+      const connectionData = JSON.stringify([{ name: API_CONFIG.SIGNALR_HUB_NAME }]);
+
       const params = new URLSearchParams({
-        'clientProtocol': '2.1',
-        'connectionData': '[{"name":"biohub"}]',
+        'clientProtocol': API_CONFIG.SIGNALR_CLIENT_PROTOCOL,
+        'connectionData': connectionData,
         '_': Date.now().toString()
       });
 
+      const cookieHeader = sessionCookies ? { 'Cookie': sessionCookies } : {};
       const response = await fetch(`${negotiateUrl}?${params}`, {
         method: 'GET',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
           'Referer': `${BASE_URL}/Attendance`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          ...cookieHeader
         }
       });
 

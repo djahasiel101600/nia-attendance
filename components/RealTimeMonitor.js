@@ -13,14 +13,30 @@ import SignalRService from '../services/SignalRService';
  * @param {string} props.employeeId - Employee ID to monitor
  * @param {Function} [props.onClose] - Callback when monitor is closed
  * @param {Function} [props.onDataUpdate] - Callback when data is updated
+ * @param {Function} [props.onSessionExpired] - Callback when API returns 401/403 (session expired)
  */
-const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
+const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate, onSessionExpired }) => {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [signalCount, setSignalCount] = useState(0);
   
+  // Polling fallback when SignalR is unavailable
+  const pollingIntervalRef = useRef(null);
+  const startPollingFallback = useCallback(() => {
+    if (pollingIntervalRef.current) return;
+    pollingIntervalRef.current = setInterval(() => {
+      fetchAttendanceData();
+    }, 30000); // every 30s
+  }, [fetchAttendanceData]);
+  const stopPollingFallback = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
   // Use ref to store the latest onDataUpdate callback without triggering re-renders
   const onDataUpdateRef = useRef(onDataUpdate);
   
@@ -32,22 +48,26 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
   const fetchAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const data = await AttendanceService.getAttendanceData(employeeId, { length: 50 });
+      if (data?.statusCode === 401 || data?.statusCode === 403) {
+        if (onSessionExpired) onSessionExpired();
+        return;
+      }
       if (data && data.records) {
         setAttendanceData(data.records);
         if (onDataUpdateRef.current) {
           onDataUpdateRef.current(data.records);
         }
       }
-      
+
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching attendance data:', error);
     } finally {
       setLoading(false);
     }
-  }, [employeeId]);
+  }, [employeeId, onSessionExpired]);
 
   // Handle SignalR notifications
   const handleSignalRNotification = useCallback((signalType, data) => {
@@ -85,7 +105,7 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
       // Get session cookies for SignalR
       const sessionCookies = await AuthService.getSessionCookies();
       
-      // Try SignalR connection
+      // Try SignalR connection (uses session cookies for token/negotiate)
       const connectionToken = await ApiService.getSignalRToken();
       
       if (connectionToken) {
@@ -96,46 +116,49 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate }) => {
         if (connected) {
           setConnectionStatus('connected');
         } else {
-          setConnectionStatus('connected'); // Still mark as connected for polling
+          setConnectionStatus('failed');
+          startPollingFallback();
         }
       } else {
-        setConnectionStatus('connected');
+        setConnectionStatus('failed');
+        startPollingFallback();
       }
       
     } catch (error) {
       console.error('Monitoring startup failed:', error);
       setConnectionStatus('failed');
+      startPollingFallback();
     }
-  }, [handleSignalRNotification]);
+  }, [handleSignalRNotification, startPollingFallback]);
 
   // Stop monitoring
   const stopMonitoring = useCallback(async () => {
+    stopPollingFallback();
     SignalRService.removeCallback(handleSignalRNotification);
     await SignalRService.stopConnection();
     setConnectionStatus('disconnected');
-  }, [handleSignalRNotification]);
+  }, [handleSignalRNotification, stopPollingFallback]);
 
   useEffect(() => {
     let mounted = true;
-    let cleanup = null;
-    
+
     const init = async () => {
       if (mounted) {
         await startMonitoring();
         await fetchAttendanceData();
       }
     };
-    
+
     init();
-    
+
     return () => {
       mounted = false;
-      // Store cleanup function to be called synchronously
-      if (!cleanup) {
-        cleanup = stopMonitoring();
-      }
+      stopPollingFallback();
+      stopMonitoring();
     };
-  }, [startMonitoring, stopMonitoring, fetchAttendanceData]);
+    // Intentionally run only on mount so we don't close/reopen the WebSocket when parent re-renders (which would cause "WebSocket closed 1000" and reconnect loops).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -391,6 +414,7 @@ RealTimeMonitor.propTypes = {
   employeeId: PropTypes.string.isRequired,
   onClose: PropTypes.func,
   onDataUpdate: PropTypes.func,
+  onSessionExpired: PropTypes.func,
 };
 
 export default RealTimeMonitor;

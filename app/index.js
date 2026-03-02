@@ -11,19 +11,21 @@ export default function Index() {
     const checkAuthentication = async () => {
       try {
         const { employeeId } = await AuthService.getStoredCredentials();
-        
-        // Small delay for better UX
-        setTimeout(() => {
-          if (employeeId) {
-            router.replace('/dashboard');
-          } else {
+
+        if (employeeId) {
+          const sessionValid = await AuthService.validateSession();
+          if (!sessionValid) {
+            await AuthService.logout();
             router.replace('/login');
+            return;
           }
-          setIsLoading(false);
-        }, 1000);
+          router.replace('/dashboard');
+        } else {
+          router.replace('/login');
+        }
       } catch (_error) {
-        // Ignore error and redirect to login
         router.replace('/login');
+      } finally {
         setIsLoading(false);
       }
     };
