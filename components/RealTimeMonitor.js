@@ -6,6 +6,9 @@ import ApiService from '../services/ApiService';
 import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
 import SignalRService from '../services/SignalRService';
+import { UI_THEME } from '../constants/uiTheme';
+
+const { colors, spacing, radius, typography } = UI_THEME;
 
 /**
  * Real-time monitoring component for attendance data
@@ -187,77 +190,68 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate, onSessionExpired }
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>📡 Live Monitor</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.title}>Live monitor</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={12}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Status Bar */}
-        <View style={styles.statusBar}>
-          <View style={styles.statusIndicator}>
-            <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-            <Text style={styles.statusText}>{getStatusText()}</Text>
-          </View>
-          <View style={styles.stats}>
-            <Text style={styles.statText}>Signals: {signalCount}</Text>
-            {lastUpdate && (
-              <Text style={styles.statText}>Updated: {lastUpdate.toLocaleTimeString()}</Text>
-            )}
-          </View>
+
+        <View style={styles.statusPill}>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+          <Text style={styles.statusText}>{getStatusText()}</Text>
         </View>
-        
-        {/* Employee Info */}
+
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>Signals: {signalCount}</Text>
+          {lastUpdate && (
+            <Text style={styles.metaText}>Updated {lastUpdate.toLocaleTimeString()}</Text>
+          )}
+        </View>
         <Text style={styles.employeeInfo}>Employee: {employeeId}</Text>
       </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            📊 Live Attendance ({attendanceData.length} records)
-          </Text>
-          
-          {(() => {
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+        <Text style={styles.sectionTitle}>
+          Live attendance ({attendanceData.length})
+        </Text>
+
+        {attendanceData.length === 0 && !loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No records</Text>
+            <Text style={styles.emptySubtitle}>Tap refresh below or wait for new events</Text>
+          </View>
+        ) : (
+          attendanceData.slice(0, 10).map((record, index) => {
             const today = new Date().toDateString();
-            return attendanceData.slice(0, 10).map((record, index) => {
-              // Check if this record is from today
-              const isToday = new Date(record.date_time).toDateString() === today;
-              
-              return (
-                <View key={index} style={[styles.recordItem, isToday && styles.recordItemToday]}>
-                  <View style={styles.recordHeader}>
-                    <Text style={styles.employeeName}>{record.employee_name}</Text>
-                    <View style={[
-                      styles.statusBadge,
-                      record.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError
-                    ]}>
-                      <Text style={styles.badgeText}>
-                        {record.status === 'ACCESS_GRANTED' ? '✅' : '❌'}
-                      </Text>
-                    </View>
+            const isToday = new Date(record.date_time).toDateString() === today;
+            const granted = record.status === 'ACCESS_GRANTED';
+            return (
+              <View key={index} style={[styles.recordItem, isToday && styles.recordItemToday]}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.employeeName} numberOfLines={1}>{record.employee_name}</Text>
+                  <View style={[styles.statusBadge, granted ? styles.badgeSuccess : styles.badgeError]}>
+                    <Text style={styles.badgeText}>{granted ? 'Granted' : 'Denied'}</Text>
                   </View>
-                  <Text style={styles.recordTime}>
-                    🕒 {new Date(record.date_time).toLocaleTimeString()}
-                  </Text>
-                  {record.temperature && (
-                    <Text style={styles.recordTemp}>🌡️ {record.temperature}°C</Text>
-                  )}
                 </View>
-              );
-            });
-          })()}
-          
-          {attendanceData.length === 0 && !loading && (
-            <Text style={styles.emptyText}>No records found</Text>
-          )}
-        </View>
+                <Text style={styles.recordTime}>
+                  {new Date(record.date_time).toLocaleTimeString()}
+                </Text>
+                {record.temperature != null && (
+                  <Text style={styles.recordTemp}>{record.temperature}°C</Text>
+                )}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
-      {/* Manual Refresh */}
-      <TouchableOpacity style={styles.refreshButton} onPress={fetchAttendanceData}>
+      <TouchableOpacity
+        style={[styles.refreshButton, loading && styles.refreshButtonDisabled]}
+        onPress={fetchAttendanceData}
+        disabled={loading}
+      >
         <Text style={styles.refreshButtonText}>
-          {loading ? '🔄 Loading...' : '🔃 Manual Refresh'}
+          {loading ? 'Loading…' : 'Refresh'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -267,146 +261,156 @@ const RealTimeMonitor = ({ employeeId, onClose, onDataUpdate, onSessionExpired }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.background,
   },
   header: {
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#111',
+    borderBottomColor: colors.border,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   title: {
-    color: '#00ff88',
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...typography.titleSmall,
+    color: colors.primary,
   },
   closeButton: {
-    backgroundColor: '#1a1a1a',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '600',
   },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusIndicator: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    marginBottom: spacing.sm,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   statusText: {
-    color: '#fff',
-    fontSize: 14,
+    ...typography.caption,
+    color: colors.text,
     fontWeight: '600',
   },
-  stats: {
-    alignItems: 'flex-end',
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
-  statText: {
-    color: '#666',
-    fontSize: 12,
+  metaText: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
   employeeInfo: {
-    color: '#aaa',
-    fontSize: 14,
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   content: {
     flex: 1,
   },
-  section: {
-    padding: 16,
+  contentInner: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   sectionTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    ...typography.label,
+    color: colors.text,
+    marginBottom: spacing.lg,
   },
   recordItem: {
-    backgroundColor: '#121212',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
   },
   recordItemToday: {
-    backgroundColor: '#1a2a1a',
     borderLeftWidth: 4,
-    borderLeftColor: '#00ff88',
+    borderLeftColor: colors.primary,
+    backgroundColor: colors.successBg,
   },
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.sm,
   },
   employeeName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.body,
+    color: colors.text,
     flex: 1,
+    marginRight: spacing.sm,
   },
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: radius.sm,
   },
   badgeSuccess: {
-    backgroundColor: '#003d1a',
+    backgroundColor: colors.successBg,
   },
   badgeError: {
-    backgroundColor: '#3d001a',
+    backgroundColor: colors.errorBg,
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
   },
   recordTime: {
-    color: '#888',
-    fontSize: 14,
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   recordTemp: {
-    color: '#888',
-    fontSize: 14,
+    ...typography.bodySmall,
+    color: colors.textSecondary,
     marginTop: 2,
   },
-  emptyText: {
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    ...typography.titleSmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
   },
   refreshButton: {
-    backgroundColor: '#00ff88',
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    margin: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
+  refreshButtonDisabled: {
+    opacity: 0.7,
+  },
   refreshButtonText: {
+    ...typography.label,
     color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 

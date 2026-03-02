@@ -1,10 +1,23 @@
 // app/dashboard.js
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import RealTimeMonitor from '../components/RealTimeMonitor';
 import AttendanceService from '../services/AttendanceService';
 import AuthService from '../services/AuthService';
+import { UI_THEME } from '../constants/uiTheme';
+
+const { colors, spacing, radius, typography } = UI_THEME;
 
 export default function Dashboard() {
   const router = useRouter();
@@ -87,15 +100,8 @@ export default function Dashboard() {
   };
 
   const toggleRealTimeMonitor = () => {
-    if (showRealTimeMonitor) {
-      // If already showing, just hide it
-      setShowRealTimeMonitor(false);
-      setIsLive(false);
-    } else {
-      // Show real-time monitor
-      setShowRealTimeMonitor(true);
-      setIsLive(true);
-    }
+    setShowRealTimeMonitor((v) => !v);
+    setIsLive((v) => !v);
   };
 
   const handleLogout = async () => {
@@ -112,20 +118,20 @@ export default function Dashboard() {
   const deniedRecords = records.filter(record => record.status === 'ACCESS_DENIED');
 
   const renderItem = ({ item }) => {
-    // Check if this record is from today
     const isToday = new Date(item.date_time).toDateString() === today;
-    
+    const granted = item.status === 'ACCESS_GRANTED';
     return (
       <View style={[styles.item, isToday && styles.itemToday]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={styles.name}>{item.employee_name}</Text>
-          <View style={[styles.badge, item.status === 'ACCESS_GRANTED' ? styles.badgeSuccess : styles.badgeError]}>
-            <Text style={styles.badgeText}>{item.status === 'ACCESS_GRANTED' ? 'GRANTED' : 'DENIED'}</Text>
+        <View style={styles.itemRow}>
+          <Text style={styles.name} numberOfLines={1}>{item.employee_name}</Text>
+          <View style={[styles.badge, granted ? styles.badgeSuccess : styles.badgeError]}>
+            <Text style={styles.badgeText}>{granted ? 'Granted' : 'Denied'}</Text>
           </View>
         </View>
-        <Text style={styles.meta}>{item.date_time_string} · {item.machine_name}</Text>
-        {item.temperature && (
-          <Text style={styles.meta}>🌡️ {item.temperature}°C</Text>
+        <Text style={styles.meta}>{item.date_time_string}</Text>
+        <Text style={styles.meta}>{item.machine_name}</Text>
+        {item.temperature != null && (
+          <Text style={styles.meta}>Temperature: {item.temperature}°C</Text>
         )}
       </View>
     );
@@ -133,7 +139,7 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Show RealTimeMonitor as overlay when active */}
+      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
       {showRealTimeMonitor ? (
         <RealTimeMonitor 
           employeeId={employeeId}
@@ -141,10 +147,7 @@ export default function Dashboard() {
             setShowRealTimeMonitor(false);
             setIsLive(false);
           }}
-          onDataUpdate={(newRecords) => {
-            // Update the main records when real-time data changes
-            setRecords(newRecords);
-          }}
+          onDataUpdate={(newRecords) => setRecords(newRecords)}
           onSessionExpired={async () => {
             await AuthService.logout();
             router.replace('/login');
@@ -152,62 +155,73 @@ export default function Dashboard() {
         />
       ) : (
         <>
-          <View style={styles.header}>
-            <Text style={styles.title}>NIA Attendance</Text>
-            <View style={styles.controlsRow}>
-              <Text style={styles.subtitle}>Employee: {employeeId}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity style={styles.smallBtn} onPress={refresh}>
-                  <Text style={styles.smallBtnText}>Refresh</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.smallBtn, isLive && styles.smallBtnActive]} 
-                  onPress={toggleRealTimeMonitor}
-                >
-                  <Text style={styles.smallBtnText}>
-                    {isLive ? 'Stop Live' : 'Start Live'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                  <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
+          <SafeAreaView style={styles.safe} edges={['top']}>
+            <View style={styles.header}>
+              <View style={styles.headerTop}>
+                <Text style={styles.title}>Attendance</Text>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity style={styles.iconBtn} onPress={refresh}>
+                    <Text style={styles.iconBtnText}>↻</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.textBtn} onPress={handleLogout}>
+                    <Text style={styles.logoutText}>Log out</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+              <Text style={styles.subtitle}>Employee ID: {employeeId}</Text>
 
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{records.length}</Text>
-                <Text style={styles.statLabel}>Records</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{todayRecords.length}</Text>
-                <Text style={styles.statLabel}>Today</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{deniedRecords.length}</Text>
-                <Text style={styles.statLabel}>Denied</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{records.length}</Text>
+                  <Text style={styles.statLabel}>Records</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statNumber, { color: colors.primary }]}>{todayRecords.length}</Text>
+                  <Text style={styles.statLabel}>Today</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statNumber, { color: colors.error }]}>{deniedRecords.length}</Text>
+                  <Text style={styles.statLabel}>Denied</Text>
+                </View>
               </View>
             </View>
-          </View>
+          </SafeAreaView>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#00ff88" style={{ marginTop: 32 }} />
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingLabel}>Loading attendance…</Text>
+            </View>
           ) : (
             <FlatList
               data={records}
               keyExtractor={(r, i) => r.employee_id + '_' + i}
               renderItem={renderItem}
-              contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-              ListEmptyComponent={<Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>No records found</Text>}
-              refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} colors={['#00ff88']} />}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyTitle}>No records yet</Text>
+                  <Text style={styles.emptySubtitle}>Pull down to refresh or tap ↻ above</Text>
+                </View>
+              }
+              refreshControl={
+                <RefreshControl
+                  refreshing={loading}
+                  onRefresh={onRefresh}
+                  colors={[colors.primary]}
+                  tintColor={colors.primary}
+                />
+              }
             />
           )}
 
           <TouchableOpacity 
             style={[styles.fab, isLive && styles.fabActive]} 
             onPress={toggleRealTimeMonitor}
+            activeOpacity={0.85}
           >
-            <Text style={styles.fabText}>{isLive ? 'LIVE' : 'GO LIVE'}</Text>
+            <Text style={styles.fabDot}>●</Text>
+            <Text style={styles.fabText}>{isLive ? 'Live on' : 'Go live'}</Text>
           </TouchableOpacity>
         </>
       )}
@@ -215,31 +229,185 @@ export default function Dashboard() {
   );
 }
 
-// Your existing styles remain the same...
+// Styles with shared theme
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', paddingTop: StatusBar.currentHeight - 20 },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#111' },
-  title: { color: '#00ff88', fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
-  controlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  subtitle: { color: '#aaa' },
-  item: { padding: 12, backgroundColor: '#121212', marginBottom: 8, borderRadius: 8 },
-  itemToday: { backgroundColor: '#1a2a1a', borderLeftWidth: 4, borderLeftColor: '#00ff88' },
-  name: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  meta: { color: '#aaa', marginTop: 4 },
-  badge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
-  badgeText: { color: '#000', fontWeight: '700', fontSize: 12 },
-  badgeSuccess: { backgroundColor: '#00ff88' },
-  badgeError: { backgroundColor: '#ff6666' },
-  smallBtn: { backgroundColor: '#1a1a1a', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 8 },
-  smallBtnActive: { backgroundColor: '#003d1a' },
-  smallBtnText: { color: '#00ff88' },
-  logoutBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 8, backgroundColor: '#2a1a1a' },
-  logoutText: { color: '#ff8888' },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  stat: { alignItems: 'center', flex: 1 },
-  statNumber: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  statLabel: { color: '#888' },
-  fab: { position: 'absolute', right: 18, bottom: 28, backgroundColor: '#00ff88', width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  fabActive: { backgroundColor: '#ff4444' },
-  fabText: { color: '#000', fontWeight: '700' }
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  safe: {
+    backgroundColor: colors.background,
+  },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  title: {
+    ...typography.title,
+    color: colors.primary,
+    fontSize: 24,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnText: {
+    fontSize: 20,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  textBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
+  },
+  logoutText: {
+    ...typography.label,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  subtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+  },
+  statNumber: {
+    ...typography.titleSmall,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  statLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  listContent: {
+    padding: spacing.lg,
+    paddingBottom: 100,
+  },
+  item: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  itemToday: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    backgroundColor: colors.successBg,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  name: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  badge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+  },
+  badgeSuccess: {
+    backgroundColor: colors.successBg,
+  },
+  badgeError: {
+    backgroundColor: colors.errorBg,
+  },
+  badgeText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  meta: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  loadingLabel: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    ...typography.titleSmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: radius.full,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabActive: {
+    backgroundColor: colors.liveInactive,
+  },
+  fabDot: {
+    fontSize: 10,
+    color: '#000',
+    fontWeight: '700',
+  },
+  fabText: {
+    ...typography.label,
+    color: '#000',
+    fontSize: 15,
+  },
 });

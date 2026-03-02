@@ -2,6 +2,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import AuthService from '../services/AuthService';
+import { UI_THEME } from '../constants/uiTheme';
+
+const { colors, typography } = UI_THEME;
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
@@ -36,10 +39,10 @@ export default function Index() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContent}>
+        <View style={styles.content}>
           <Text style={styles.appName}>NIA Attendance</Text>
-          <Text style={styles.subtitle}>Loading...</Text>
-          <ActivityIndicator size="large" color="#00ff88" style={styles.spinner} />
+          <Text style={styles.subtitle}>Loading…</Text>
+          <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
         </View>
       </View>
     );
@@ -51,25 +54,25 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContent: {
+  content: {
     alignItems: 'center',
   },
   appName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#00ff88',
+    ...typography.title,
+    fontSize: 28,
+    color: colors.primary,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
-    marginBottom: 20,
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginBottom: 24,
   },
   spinner: {
-    marginTop: 20,
+    marginTop: 8,
   },
 });
